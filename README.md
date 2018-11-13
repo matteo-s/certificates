@@ -9,6 +9,17 @@ For more information and docs see [the Step website](https://smallstep.com/cli/)
 and the [blog post](https://smallstep.com/blog/zero-trust-swiss-army-knife.html)
 announcing Step Certificate Authority.
 
+## Why?
+
+Managing your own *public key infrastructure* (PKI) can be tedious and error
+prone. Good security hygiene is hard. Setting up simple PKI is out of reach for
+many small teams, and following best practices like proper certificate revocation
+and rolling is challenging even for experts.
+
+This project is part of smallstep's broader security architecture, which makes
+it much easier to implement good security practices early, and incrementally
+improve them as your system matures.
+
 ### Table of Contents
 
 - [Installing](#installing)
@@ -16,8 +27,10 @@ announcing Step Certificate Authority.
 - [Terminology](#terminology)
 - [Getting Started](#getting-started)
 - [I've Got a Running CA! Now What?](#now-what)
+- [Commonly Asked Questions](#./docs/common-questions.md)
+- [Recommended Defaults](#./docs/recommendations.md)
 - [Versioning](#versioning)
-- [How To Create A New Release](./distribution.md)
+- [How To Create A New Release](./docs/distribution.md)
 - [LICENSE](./LICENSE)
 - [CHANGELOG](./CHANGELOG.md)
 
@@ -62,7 +75,10 @@ Documentation can be found in three places:
 
 ### PKI - Public Key Infrastructure
 
-Blah blah
+A set of roles, policies, and procedures needed to create, manage, distribute,
+use, store, and revoke digital certificates and manage public-key encryption.
+The purpose of a PKI is to facilitate the secure electronic transfer of
+information for a range of network activities.
 
 ### Provisioners
 
