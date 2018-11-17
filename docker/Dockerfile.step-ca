@@ -1,18 +1,17 @@
 FROM smallstep/step-cli:0.0.2-rc.17
 
-ARG CFGPATH="docker/ca.json"
 ARG BINPATH="bin/step-ca"
 
-ENV PORT=8000
-ENV CONFIGPATH="/home/step/ca.json"
+ENV PORT=443
+ENV CONFIGPATH="/home/step/.step/config/ca.json"
 ENV PWDPATH="/home/step/secrets/password"
 
-COPY $CFGPATH $CONFIGPATH
 COPY $BINPATH "/usr/local/bin/step-ca"
 
 EXPOSE $PORT
 VOLUME ["/home/step/.step/secrets"]
+VOLUME ["/home/step/.step/config"]
 VOLUME ["/home/step/secrets"]
 STOPSIGNAL SIGTERM
 
-CMD /bin/sh -c "/usr/local/bin/step-ca $CONFIGPATH --password-file=$PWDPATH"
+CMD exec /bin/sh -c "/usr/local/bin/step-ca --password-file $PWDPATH $CONFIGPATH"
