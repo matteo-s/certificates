@@ -1,7 +1,6 @@
 package logging
 
 import (
-	"net"
 	"net/http"
 	"time"
 
@@ -38,21 +37,21 @@ func (l *LoggerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // writeEntry writes to the Logger writer the request information in the logger.
 func (l *LoggerHandler) writeEntry(w ResponseLogger, r *http.Request, t time.Time, d time.Duration) {
-	var reqID, user string
+	//var reqID, user string
 
-	ctx := r.Context()
-	if v, ok := ctx.Value(RequestIDKey).(string); ok && v != "" {
-		reqID = v
-	}
-	if v, ok := ctx.Value(UserIDKey).(string); ok && v != "" {
-		user = v
-	}
+	//ctx := r.Context()
+	//if v, ok := ctx.Value(RequestIDKey).(string); ok && v != "" {
+	//	reqID = v
+	//}
+	//if v, ok := ctx.Value(UserIDKey).(string); ok && v != "" {
+	//	user = v
+	//}
 
 	// Remote hostname
-	addr, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		addr = r.RemoteAddr
-	}
+	//addr, _, err := net.SplitHostPort(r.RemoteAddr)
+	//if err != nil {
+	//	addr = r.RemoteAddr
+	//}
 
 	// From https://github.com/gorilla/handlers
 	uri := r.RequestURI
@@ -69,20 +68,20 @@ func (l *LoggerHandler) writeEntry(w ResponseLogger, r *http.Request, t time.Tim
 	status := w.StatusCode()
 
 	fields := logrus.Fields{
-		"request-id":     reqID,
-		"remote-address": addr,
-		"name":           l.name,
-		"user-id":        user,
-		"time":           t.Format(time.RFC3339),
-		"duration-ns":    d.Nanoseconds(),
-		"duration":       d.String(),
-		"method":         r.Method,
-		"path":           uri,
-		"protocol":       r.Proto,
-		"status":         status,
-		"size":           w.Size(),
-		"referer":        r.Referer(),
-		"user-agent":     r.UserAgent(),
+		//"request-id": reqID,
+		//"remote-address": addr,
+		//"name":           l.name,
+		//"user-id":        user,
+		//"time":           t.Format(time.RFC3339),
+		//"duration-ns":    d.Nanoseconds(),
+		"duration": d.String(),
+		"method":   r.Method,
+		"path":     uri,
+		//"protocol":       r.Proto,
+		"status": status,
+		//"size":           w.Size(),
+		//"referer":        r.Referer(),
+		//"user-agent":     r.UserAgent(),
 	}
 
 	for k, v := range w.Fields() {
