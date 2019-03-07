@@ -8,9 +8,28 @@
 		"ca.smallstep.com"
 	],
 	"logger": {
-		"format": "text"
+		"format": "text|json|common"
 	},
+    "monitoriing": {
+        "type": "newrelic",
+        "name": "appName",
+        "key": "license-key-XXX"
+    },
 	"authority": {
+        "claims": {
+            "minTLSCertDuration": "5m",
+            "maxTLSCertDuration": "10d",
+            "defaultTLSCertDuration": "48h",
+            "disableRenewal": false
+        },
+        "template": {
+            "country": "USA",
+            "organization": "Smallstep Inc.",
+            "organizationalUnit": "Engineering",
+            "locality": "San Francisco",
+            "province": "California",
+            "streetAddress": "1 Main st"
+        },
 		"provisioners": [
 			{
 				"name": "dev@smallstep.com",
@@ -52,7 +71,8 @@
 				},
 				"encryptedKey": "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJjdHkiOiJqd2sranNvbiIsImVuYyI6IkEyNTZHQ00iLCJwMmMiOjEwMDAwMCwicDJzIjoiUlZQeTV5c3BGQXduSFpLNmdKdU1yUSJ9.98CLZKtTeiAodBMhn1T51IMt2RY6OT0pPXbZ7c6FULINrkon_TV8Ig.cRVuQCvisUlxhnSb.kAmBXBt3Q8VQkhu40IXc-WbyqNBV9dQG0pHNWy158ow-qcqJohJzZqVJDnM3VkmQ8-K5nxox-m9mVRU6rzOcNz129vHimfsQBTzbJfX9A-l7erJfJppQ1-NTS-_3rLNe455g0OWvk7c09RcBlA-IJ_NgMiQZ_UTp1HVZNBgNp2-LfvgSHa1DgXXX7zBtDBkibNQZ3r8oX1BqOOYdCqcYyw2E62WuYpKU4eCaHr4y3N-9n3HxNqIxk970NNoq_p7GLLqKlrY_5_jAGJJ32sZWtENPLnF7Sy6ZexqANZBNKJSR0NOdXnKjxHOoG4DZjBqmXnL9EW_1OrzNOl1KHxg.m3nY1-nQCjKxsYlDbvqX6g"
 			}
-		]
+		],
+        "disableIssuedAtCheck": false
 	},
 	"tls": {
 		"cipherSuites": [
