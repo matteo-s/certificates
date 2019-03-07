@@ -53,21 +53,24 @@ Note that JSON does not support comments, so this example won't be functional.
         // Default to the following list.
         "cipherSuites": [
             "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
-            "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
-            "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"
+            "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
         ],
-        // Minimum TLS version supported.
+        // Minimum TLS version supported (1.2 (default), 1.0, 1.1, 1.2).
+        // Default: 1.2
         "minVersion": 1.2,
-        // Maximum TLS version supported.
+        // Maximum TLS version supported (1.2 (default), 1.0, 1.1, 1.2).
+        // Default: 1.2
         "maxVersion": 1.2,
         // TLS renegotation support. If enabled, it allows a remote server to
         // repeatedly request renegotiation.
+        // Default: false
         "renegotiation": false
     },
     // Authority configuration.
     // Mandatory.
     "authority": {
-        // Default claims for all provisioners.
+        // Default claims for all provisioners, superseded by individual provisioner
+        // claims.
         // Optional.
         "claims": {
             // Minimum duration for a TLS certificate.
@@ -83,11 +86,12 @@ Note that JSON does not support comments, so this example won't be functional.
             // Optional, defaults to false
             "disableRenewal": false
         },
-        // Disable the check for the iat (issued at).
-        // If false, only times after the start of the CA will be accepted.
+        // Disable the check for the iat (issued at) when authorizing tokens.
+        // If false, only 'iat's after the `start time` of the CA will be accepted.
         // Optional, defaults to false.
         "disableIssuedAtCheck": false,
-        // Certificate subject template.
+        // Certificate subject template. Any value in this template will replace
+        // empty values in the `Subject` of a certificate signed by the CA.
         // Optional.
         "template": {
             "country": "US",
@@ -118,7 +122,8 @@ Note that JSON does not support comments, so this example won't be functional.
                     "x": "Hw0_-aAqysXbk3O7rFb2x8Y_L2MWkl6IQ10jRCCJW9I",
                     "y": "wlDo1SXqn5K8ebraQVoC9weczleOpHQH3vTv6ZUUqVc"
                 },
-                // Claims for this provisioner.
+                // Claims for this provisioner. Uses default global provisioner
+                // claims if individual claims not present.
                 // Optional.
                 "claims": {
                     "minTLSCertDuration": "5m",
