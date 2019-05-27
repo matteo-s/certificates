@@ -102,22 +102,20 @@ func (db *DB) IsRevoked(sn string) (bool, error) {
 
 // Revoke adds a certificate to the revocation table.
 func (db *DB) Revoke(rci *RevokedCertificateInfo) error {
-	isRvkd, err := db.IsRevoked(rci.Serial)
-	if err != nil {
-		return err
-	}
-	if isRvkd {
-		return ErrAlreadyExists
-	}
 	rcib, err := json.Marshal(rci)
 	if err != nil {
 		return errors.Wrap(err, "error marshaling revoked certificate info")
 	}
 
-	if err = db.Set(revokedCertsTable, []byte(rci.Serial), rcib); err != nil {
-		return errors.Wrap(err, "database Set error")
+	_, swapped, err := db.CmpAndSwap(revokedCertsTable, []byte(rci.Serial), nil, rcib)
+	switch {
+	case err != nil:
+		return errors.Wrap(err, "AuthDB CmpAndSwap error")
+	case !swapped:
+		return ErrAlreadyExists
+	default:
+		return nil
 	}
-	return nil
 }
 
 // StoreCertificate stores a certificate PEM.
@@ -132,15 +130,11 @@ func (db *DB) StoreCertificate(crt *x509.Certificate) error {
 // for the first time, false otherwise.
 func (db *DB) UseToken(id, tok string) (bool, error) {
 	_, swapped, err := db.CmpAndSwap(usedOTTTable, []byte(id), nil, []byte(tok))
-	switch {
-	case err != nil:
+	if err != nil {
 		return false, errors.Wrapf(err, "error storing used token %s/%s",
 			string(usedOTTTable), id)
-	case !swapped:
-		return false, nil
-	default:
-		return true, nil
 	}
+	return swapped, nil
 }
 
 // Shutdown sends a shutdown message to the database.
