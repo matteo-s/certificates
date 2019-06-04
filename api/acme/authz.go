@@ -146,11 +146,15 @@ func (ba *BaseAuthz) save(db nosql.DB, old Authz) error {
 	}
 }
 
+func (ba *BaseAuthz) clone() *BaseAuthz {
+	u := *ba
+	return &u
+}
+
 // UpdateStatus attempts to update the status on a BaseAuthz and stores the
 // updating object if necessary.
 func (ba *BaseAuthz) UpdateStatus(db nosql.DB) (Authz, error) {
-	_newAuthz := *ba
-	newAuthz := &_newAuthz
+	newAuthz := ba.clone()
 
 	now := time.Now().UTC()
 	switch ba.Status {
@@ -174,7 +178,7 @@ func (ba *BaseAuthz) UpdateStatus(db nosql.DB) (Authz, error) {
 			break
 		}
 
-		var isValid = true
+		var isValid = false
 		for _, chID := range ba.Challenges {
 			ch, err := GetChallenge(db, chID)
 			if err != nil {

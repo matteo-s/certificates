@@ -450,6 +450,7 @@ func (a *acmeHandler) NewAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	acc, ok := accountFromContext(r)
+	httpStatus := http.StatusCreated
 	if !ok {
 		// Account does not exist //
 		if nar.OnlyReturnExisting {
@@ -470,10 +471,10 @@ func (a *acmeHandler) NewAccount(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, BadRequest(errors.Errorf("error creating acme account")))
 			return
 		}
-		w.WriteHeader(http.StatusCreated)
+
 	} else {
 		// Account exists //
-		w.WriteHeader(http.StatusOK)
+		httpStatus = http.StatusOK
 	}
 
 	out, err := acc.ToACME(a.db, a.Dir)
@@ -483,6 +484,7 @@ func (a *acmeHandler) NewAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Location", a.Dir.GetAccount(acc.ID, true))
 	JSON(w, out)
+	w.WriteHeader(httpStatus)
 	return
 }
 
@@ -544,10 +546,6 @@ func (a *acmeHandler) NewOrder(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, Unauthorized(errors.Errorf("account not found")))
 		return
 	}
-	if !acc.IsValid() {
-		WriteError(w, Unauthorized(errors.Errorf("account is not valid")))
-		return
-	}
 
 	payload, ok := payloadFromContext(r)
 	if !ok || payload == nil {
@@ -584,9 +582,9 @@ func (a *acmeHandler) NewOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
 	w.Header().Set("Location", a.Dir.GetOrder(acc.ID, true))
 	JSON(w, out)
+	w.WriteHeader(http.StatusCreated)
 	return
 }
 
@@ -596,10 +594,6 @@ func (a *acmeHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	if !ok || acc == nil {
 		// Account does not exist //
 		WriteError(w, Unauthorized(errors.Errorf("account not found")))
-		return
-	}
-	if !acc.IsValid() {
-		WriteError(w, Unauthorized(errors.Errorf("account is not valid")))
 		return
 	}
 
@@ -637,6 +631,36 @@ func (a *acmeHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Location", a.Dir.GetOrder(order.ID, true))
+	JSON(w, out)
+	w.WriteHeader(http.StatusOK)
+	return
+}
+
+// GetOrdersByAccount ACME api for retrieving the list of order urls belonging to an account.
+func (a *acmeHandler) GetOrdersByAccount(w http.ResponseWriter, r *http.Request) {
+	acc, ok := accountFromContext(r)
+	if !ok || acc == nil {
+		// Account does not exist //
+		WriteError(w, acme.AccountDoesNotExistErr(nil))
+		return
+	}
+
+	payload, ok := payloadFromContext(r)
+	if !ok || payload == nil {
+		WriteError(w, acme.ServerInternalErr(errors.Errorf("payload not in request context")))
+		return
+	}
+
+	if !payload.isPostAsGet {
+		WriteError(w, acme.MalformedErr(errors.Errorf("expected POST-as-GET; empty body")))
+		return
+	}
+
+	out, err := acc.ToACMEOrders(a.db, a.Dir)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	JSON(w, out)
 	w.WriteHeader(http.StatusOK)
 	return
@@ -785,6 +809,7 @@ func (a *acmeHandler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Printf("payload = %+v\n", payload)
 	// If empty JSON payload then attempt to validate the challenge.
 	if payload.isEmptyJSON {
 		var isValid bool

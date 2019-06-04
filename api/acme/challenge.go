@@ -252,6 +252,9 @@ func (hc *HTTP01Challenge) Validate(db nosql.DB, jwk *jose.JSONWebKey) (Challeng
 
 	// Update and store the challenge.
 	upd := &HTTP01Challenge{hc.BaseChallenge.clone()}
+	upd.Status = statusValid
+	upd.Validated = time.Now().UTC()
+
 	if err := upd.save(db, hc); err != nil {
 		return nil, false, err
 	}

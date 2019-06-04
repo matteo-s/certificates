@@ -272,6 +272,7 @@ func (h *caHandler) Route(r Router) {
 	r.MethodFunc("POST", ah.Dir.GetAccount("{accID}", false), extractPayloadByKid(ah.UpdateAccount))
 	r.MethodFunc("POST", ah.Dir.NewOrder, extractPayloadByKid(ah.NewOrder))
 	r.MethodFunc("POST", ah.Dir.GetOrder("{ordID}", false), extractPayloadByKid(ah.GetOrder))
+	r.MethodFunc("POST", ah.Dir.GetOrdersByAccount("{accID}", false), extractPayloadByKid(ah.GetOrdersByAccount))
 	r.MethodFunc("POST", ah.Dir.GetFinalize("{ordID}", false), extractPayloadByKid(ah.FinalizeOrder))
 	//r.MethodFunc("POST", ah.Dir.GetFinalize("{ordID}"), extractPayloadByKid(ah.Finalize))
 	r.MethodFunc("POST", ah.Dir.GetAuthz("{authzID}", false), extractPayloadByKid(ah.GetAuthz))

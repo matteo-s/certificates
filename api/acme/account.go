@@ -143,6 +143,32 @@ func (a *Account) IsValid() bool {
 	return a.Status == statusValid
 }
 
+// ToACMEOrders returns the list of orders belonging to an account in ACME protocol
+// format.
+func (a *Account) ToACMEOrders(db nosql.DB, dir *Directory) (interface{}, error) {
+	oidsB, err := db.Get(ordersByAccountIDTable, []byte(a.ID))
+	if err != nil {
+		return nil, ServerInternalErr(errors.Errorf("orders for account %s not found", a.ID))
+	}
+	var oids []string
+	if err = json.Unmarshal(oidsB, &oids); err != nil {
+		return nil, ServerInternalErr(err)
+	}
+
+	var ret = []string{}
+	for _, oid := range oids {
+		order, err := GetOrder(db, oid)
+		if err != nil {
+			return nil, ServerInternalErr(err)
+		}
+		if order.Status == statusInvalid {
+			continue
+		}
+		ret = append(ret, dir.GetOrder(oid, true))
+	}
+	return ret, nil
+}
+
 // ToACME converts the internal Account type into the public acmeAccount
 // type for presentation in the ACME protocol.
 func (a *Account) ToACME(db nosql.DB, dir *Directory) (interface{}, error) {
