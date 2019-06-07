@@ -212,5 +212,12 @@ func (a *Authority) ValidateChallenge(accID, chID string, jwk *jose.JSONWebKey) 
 
 // GetCertificate retrieves the Certificate by ID.
 func (a *Authority) GetCertificate(accID, certID string) ([]byte, error) {
-	return nil, nil
+	cert, err := getCertificate(a.db, certID)
+	if err != nil {
+		return nil, err
+	}
+	if accID != cert.AccountID {
+		return nil, UnauthorizedErr(errors.New("account does not own certificate"))
+	}
+	return cert.toACME(a.db, a.dir)
 }

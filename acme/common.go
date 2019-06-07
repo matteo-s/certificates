@@ -27,6 +27,7 @@ var (
 	nonceTable             = []byte("nonce-table")
 	orderTable             = []byte("acme-orders")
 	ordersByAccountIDTable = []byte("acme-account-orders-index")
+	certTable              = []byte("acme-certs")
 )
 
 var (

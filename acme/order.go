@@ -242,21 +242,34 @@ func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAut
 
 	if !reflect.DeepEqual(csrNames, orderNames) {
 		// TODO Note reason on the Order error object.
-		return o, BadCSRErr(errors.Errorf("CSR names do not match order identifiers exactly"))
+		return nil, BadCSRErr(errors.Errorf("CSR names do not match order identifiers exactly"))
 	}
 
 	// Create and store a new certificate.
-	serverCrt, _, err := auth.Sign(csr, provisioner.Options{
+	leaf, inter, err := auth.Sign(csr, provisioner.Options{
 		NotBefore: provisioner.NewTimeDuration(o.NotBefore),
 		NotAfter:  provisioner.NewTimeDuration(o.NotAfter),
 	})
+	if err != nil {
+		return nil, ServerInternalErr(errors.Wrap(err, "error generating certificat from finalize resource"))
+	}
+
+	cert, err := newCert(db, CertOptions{
+		AccountID:     o.AccountID,
+		OrderID:       o.ID,
+		Leaf:          leaf,
+		Intermediates: []*x509.Certificate{inter},
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	_newOrder := *o
 	newOrder := &_newOrder
-	newOrder.Certificate = serverCrt.SerialNumber.String()
+	newOrder.Certificate = cert.ID
 	newOrder.Status = statusValid
 	if err := newOrder.save(db, o); err != nil {
-		return o, err
+		return nil, err
 	}
 	return newOrder, nil
 }
