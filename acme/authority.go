@@ -16,6 +16,7 @@ type ACME interface {
 	UseNonce(string) error
 	NewAccount(AccountOptions) (*Account, error)
 	UpdateAccount(string, []string) (*Account, error)
+	DeactivateAccount(string) (*Account, error)
 	GetAccount(string) (*Account, error)
 	GetAccountByKeyID(string) (*Account, error)
 	GetOrdersByAccount(string) ([]string, error)
@@ -93,6 +94,18 @@ func (a *Authority) UpdateAccount(id string, contact []string) (*Account, error)
 func (a *Authority) GetAccount(id string) (*Account, error) {
 	acc, err := getAccountByID(a.db, id)
 	if err != nil {
+		return nil, err
+	}
+	return acc.toACME(a.db, a.dir)
+}
+
+// DeactivateAccount deactivates an ACME account.
+func (a *Authority) DeactivateAccount(id string, contact []string) (*Account, error) {
+	acc, err := getAccountByID(a.db, id)
+	if err != nil {
+		return nil, err
+	}
+	if acc, err = acc.deactivate(a.db); err != nil {
 		return nil, err
 	}
 	return acc.toACME(a.db, a.dir)

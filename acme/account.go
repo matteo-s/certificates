@@ -42,11 +42,12 @@ type AccountOptions struct {
 
 // account represents an ACME account.
 type account struct {
-	ID      string `json:"id"`
-	Created time.Time
-	Key     *jose.JSONWebKey `json:"key"`
-	Contact []string         `json:"contact,omitempty"`
-	Status  string           `json:"status"`
+	ID          string           `json:"id"`
+	Created     time.Time        `json:"created"`
+	Deactivated time.Time        `json:"deactivated"`
+	Key         *jose.JSONWebKey `json:"key"`
+	Contact     []string         `json:"contact,omitempty"`
+	Status      string           `json:"status"`
 }
 
 // newAccount returns a new acme account type.
@@ -155,6 +156,17 @@ func saveUpdate(db nosql.DB, acc, swp *account) error {
 func (a *account) update(db nosql.DB, contact []string) (*account, error) {
 	b := *a
 	b.Contact = contact
+	if err := (&b).save(db, a); err != nil {
+		return nil, err
+	}
+	return &b, nil
+}
+
+// deactivate deactivates the acme account.
+func (a *account) deactivate(db nosql.DB) (*account, error) {
+	b := *a
+	b.Status = statusDeactivated
+	b.Deactivated = time.Now().UTC()
 	if err := (&b).save(db, a); err != nil {
 		return nil, err
 	}

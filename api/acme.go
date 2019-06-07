@@ -241,8 +241,7 @@ func (h *caHandler) UpdateAccount(w http.ResponseWriter, r *http.Request) {
 		}
 		var err error
 		if uar.IsDeactivateRequest() {
-			// TODO
-			//acc, err = acc.Deactivate(a.db)
+			acc, err = h.Authority.DeactivateAccount(acc.GetID())
 		} else {
 			acc, err = h.Authority.UpdateAccount(acc.GetID(), uar.Contact)
 		}
