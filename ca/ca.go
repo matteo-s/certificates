@@ -103,8 +103,15 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 	// Add api endpoints in / and /1.0
 	routerHandler := api.New(auth)
 	routerHandler.Route(mux)
+	mux.Route("/acme", func(r chi.Router) {
+		routerHandler.RouteACME(r)
+	})
 	mux.Route("/1.0", func(r chi.Router) {
-		routerHandler.Route(r)
+		routerHandler.RouteACME(r)
+	})
+
+	mux.Route("/1.0/acme", func(r chi.Router) {
+		routerHandler.RouteACME(r)
 	})
 
 	// Add monitoring if configured

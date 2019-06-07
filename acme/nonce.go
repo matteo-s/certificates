@@ -23,7 +23,7 @@ func NewNonce(db nosql.DB) (string, error) {
 	b := make([]byte, nonceLen)
 	_, err := rand.Read(b)
 	if err != nil {
-		return "", errors.Wrap(err, "error reading random bytes from crypto/rand")
+		return "", ServerInternalErr(errors.Wrap(err, "error reading random bytes from crypto/rand"))
 	}
 
 	val := base64.RawURLEncoding.EncodeToString(b)
@@ -32,17 +32,17 @@ func NewNonce(db nosql.DB) (string, error) {
 	}
 	nb, err := json.Marshal(n)
 	if err != nil {
-		return "", errors.Wrap(err, "error marshaling nonce")
+		return "", ServerInternalErr(errors.Wrap(err, "error marshaling nonce"))
 	}
 	if err := db.Set(nonceTable, []byte(val), nb); err != nil {
-		return "", errors.Wrap(err, "error saving nonce")
+		return "", ServerInternalErr(errors.Wrap(err, "error saving nonce"))
 	}
 	return val, nil
 }
 
 // UseNonce verifies that the nonce is valid (by checking if it exists),
 // and if so, consumes the nonce resource by deleting it from the database.
-func UseNonce(db nosql.DB, nonce string) (bool, error) {
+func UseNonce(db nosql.DB, nonce string) error {
 	err := db.Update(&database.Tx{
 		Operations: []*database.TxEntry{
 			&database.TxEntry{
@@ -60,10 +60,10 @@ func UseNonce(db nosql.DB, nonce string) (bool, error) {
 
 	switch {
 	case nosql.IsErrNotFound(err):
-		return false, nil
+		return BadNonceErr(nil)
 	case err != nil:
-		return false, errors.Wrapf(err, "error deleting nonce")
+		return ServerInternalErr(errors.Wrap(err, "use-nonce: DB error"))
 	default:
-		return true, nil
+		return nil
 	}
 }

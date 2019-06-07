@@ -15,6 +15,32 @@ var defaultOrderExpiry = time.Hour * 24
 
 // Order contains order metadata for the ACME protocol order type.
 type Order struct {
+	Status         string       `json:"status"`
+	Expires        string       `json:"expires,omitempty"`
+	Identifiers    []Identifier `json:"identifiers"`
+	NotBefore      string       `json:"notBefore,omitempty"`
+	NotAfter       string       `json:"notAfter,omitempty"`
+	Error          interface{}  `json:"error,omitempty"`
+	Authorizations []string     `json:"authorizations"`
+	Finalize       string       `json:"finalize"`
+	Certificate    string       `json:"certificate,omitempty"`
+	ID             string       `json:"-"`
+}
+
+// GetID returns the Order ID.
+func (o *Order) GetID() string {
+	return o.ID
+}
+
+// OrderOptions options with which to create a new Order.
+type OrderOptions struct {
+	AccountID   string       `json:"accID"`
+	Identifiers []Identifier `json:"identifiers"`
+	NotBefore   time.Time    `json:"notBefore"`
+	NotAfter    time.Time    `json:"notAfter"`
+}
+
+type order struct {
 	ID             string       `json:"id"`
 	AccountID      string       `json:"accountID"`
 	Created        time.Time    `json:"created"`
@@ -28,32 +54,24 @@ type Order struct {
 	Certificate    string       `json:"certificate,omitempty"`
 }
 
-// OrderOptions options with which to create a new Order.
-type OrderOptions struct {
-	AccountID   string       `json:"accID"`
-	Identifiers []Identifier `json:"identifiers"`
-	NotBefore   time.Time    `json:"notBefore"`
-	NotAfter    time.Time    `json:"notAfter"`
-}
-
-// NewOrder returns a new Order type.
-func NewOrder(db nosql.DB, ops OrderOptions) (*Order, error) {
+// newOrder returns a new Order type.
+func newOrder(db nosql.DB, ops OrderOptions) (*order, error) {
 	id, err := randID()
 	if err != nil {
-		return nil, errors.Wrap(err, "error generating random id for ACME challenge")
+		return nil, err
 	}
 
 	authzs := make([]string, len(ops.Identifiers))
 	for i, identifier := range ops.Identifiers {
-		authz, err := NewAuthz(db, ops.AccountID, identifier)
+		authz, err := newAuthz(db, ops.AccountID, identifier)
 		if err != nil {
 			return nil, err
 		}
-		authzs[i] = authz.GetID()
+		authzs[i] = authz.getID()
 	}
 
 	now := time.Now().UTC()
-	o := &Order{
+	o := &order{
 		ID:             id,
 		AccountID:      ops.AccountID,
 		Created:        now,
@@ -71,7 +89,7 @@ func NewOrder(db nosql.DB, ops OrderOptions) (*Order, error) {
 	// TODO should we delete the Order if there are errors downstream?
 
 	// Update the "order IDs by account ID" index //
-	orderIDs, err := GetOrderIDsByAccount(db, ops.AccountID)
+	orderIDs, err := getOrderIDsByAccount(db, ops.AccountID)
 	if err != nil {
 		return nil, err
 	}
@@ -81,26 +99,27 @@ func NewOrder(db nosql.DB, ops OrderOptions) (*Order, error) {
 	} else {
 		oldb, err = json.Marshal(orderIDs)
 		if err != nil {
-			return nil, errors.Wrap(err, "error marshaling old order IDs slice")
+			return nil, ServerInternalErr(errors.Wrap(err, "error marshaling old order IDs slice"))
 		}
 	}
 	newOrderIDs := append(orderIDs, o.ID)
 	newb, err := json.Marshal(newOrderIDs)
 	if err != nil {
-		return nil, errors.Wrap(err, "error marshaling new order IDs slice")
+		return nil, ServerInternalErr(errors.Wrap(err, "error marshaling new order IDs slice"))
 	}
 	_, swapped, err := db.CmpAndSwap(ordersByAccountIDTable, []byte(o.AccountID), oldb, newb)
 	switch {
 	case err != nil:
-		return nil, errors.Wrapf(err, "error storing order IDs for account %s", o.AccountID)
+		return nil, ServerInternalErr(errors.Wrapf(err, "error storing order IDs for account %s", o.AccountID))
 	case !swapped:
-		return nil, errors.Errorf("error storing order IDs for account %s; order IDs changed since last read", o.AccountID)
+		return nil, ServerInternalErr(errors.Errorf("error storing order IDs "+
+			"for account %s; order IDs changed since last read", o.AccountID))
 	default:
 		return o, nil
 	}
 }
 
-func (o *Order) save(db nosql.DB, old *Order) error {
+func (o *order) save(db nosql.DB, old *order) error {
 	var (
 		err  error
 		oldB []byte
@@ -109,28 +128,29 @@ func (o *Order) save(db nosql.DB, old *Order) error {
 		oldB = nil
 	} else {
 		if oldB, err = json.Marshal(old); err != nil {
-			return errors.Wrap(err, "error marshaling old acme order")
+			return ServerInternalErr(errors.Wrap(err, "error marshaling old acme order"))
 		}
 	}
 
 	newB, err := json.Marshal(o)
 	if err != nil {
-		return errors.Wrap(err, "error marshaling new acme order")
+		return ServerInternalErr(errors.Wrap(err, "error marshaling new acme order"))
 	}
 
 	_, swapped, err := db.CmpAndSwap(orderTable, []byte(o.ID), oldB, newB)
 	switch {
 	case err != nil:
-		return errors.Wrap(err, "error writing acme order to disk")
+		return ServerInternalErr(errors.Wrap(err, "error writing acme order to disk"))
 	case !swapped:
-		return errors.Errorf("error writing acme order to disk; order %s has changed since last read", o.ID)
+		return ServerInternalErr(errors.Errorf("error writing acme order to disk; "+
+			"order %s has changed since last read", o.ID))
 	default:
 		return nil
 	}
 }
 
-// UpdateStatus updates Order status if necessary.
-func (o *Order) UpdateStatus(db nosql.DB) (*Order, error) {
+// updateStatus updates order status if necessary.
+func (o *order) updateStatus(db nosql.DB) (*order, error) {
 	_newOrder := *o
 	newOrder := &_newOrder
 
@@ -158,14 +178,14 @@ func (o *Order) UpdateStatus(db nosql.DB) (*Order, error) {
 
 		var allValid = true
 		for _, azID := range o.Authorizations {
-			authz, err := GetAuthz(db, azID)
+			authz, err := getAuthz(db, azID)
 			if err != nil {
-				return o, err
+				return nil, err
 			}
-			if authz, err = authz.UpdateStatus(db); err != nil {
-				return o, err
+			if authz, err = authz.updateStatus(db); err != nil {
+				return nil, err
 			}
-			if authz.GetStatus() != statusValid {
+			if authz.getStatus() != statusValid {
 				allValid = false
 				break
 			}
@@ -180,30 +200,30 @@ func (o *Order) UpdateStatus(db nosql.DB) (*Order, error) {
 	}
 
 	if err := newOrder.save(db, o); err != nil {
-		return o, err
+		return nil, err
 	}
 	return newOrder, nil
 }
 
-// Finalize signs a certificate if the necessary conditions for Order completion
+// finalize signs a certificate if the necessary conditions for Order completion
 // have been met.
-func (o *Order) Finalize(db nosql.DB, csr *x509.CertificateRequest, auth Authority) (*Order, error) {
+func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAuthority) (*order, error) {
 	var err error
-	if o, err = o.UpdateStatus(db); err != nil {
+	if o, err = o.updateStatus(db); err != nil {
 		return o, err
 	}
 	switch o.Status {
 	case statusInvalid:
-		return o, errors.Errorf("order %s has been abandoned", o.ID)
+		return o, OrderNotReadyErr(errors.Errorf("order %s has been abandoned", o.ID))
 	case statusValid:
 		break
 		//return o, errors.Errorf("order %s is already valid", o.ID)
 	case statusPending:
-		return o, errors.Errorf("order %s is not ready", o.ID)
+		return o, OrderNotReadyErr(errors.Errorf("order %s is not ready", o.ID))
 	case statusReady:
 		break
 	default:
-		return o, errors.Errorf("unexpected status %s for order %s", o.Status, o.ID)
+		return o, ServerInternalErr(errors.Errorf("unexpected status %s for order %s", o.Status, o.ID))
 	}
 
 	// Validate identifier names against CSR alternative names //
@@ -222,7 +242,7 @@ func (o *Order) Finalize(db nosql.DB, csr *x509.CertificateRequest, auth Authori
 
 	if !reflect.DeepEqual(csrNames, orderNames) {
 		// TODO Note reason on the Order error object.
-		return o, errors.Errorf("CSR names do not match order identifiers exactly")
+		return o, BadCSRErr(errors.Errorf("CSR names do not match order identifiers exactly"))
 	}
 
 	// Create and store a new certificate.
@@ -241,68 +261,41 @@ func (o *Order) Finalize(db nosql.DB, csr *x509.CertificateRequest, auth Authori
 	return newOrder, nil
 }
 
-// GetOrder retrieves and unmarshals an ACME Order type from the database.
-func GetOrder(db nosql.DB, id string) (*Order, error) {
+// getOrder retrieves and unmarshals an ACME Order type from the database.
+func getOrder(db nosql.DB, id string) (*order, error) {
 	b, err := db.Get(orderTable, []byte(id))
-	if err != nil {
-		// TODO return a proper API error indicating bad request.
-		return nil, errors.WithStack(err)
+	if nosql.IsErrNotFound(err) {
+		return nil, MalformedErr(errors.Wrapf(err, "order %s not found", id))
+	} else if err != nil {
+		return nil, ServerInternalErr(errors.Wrap(err, "error loading order"))
 	}
-	var o Order
+	var o order
 	if err := json.Unmarshal(b, &o); err != nil {
-		return nil, err
+		return nil, ServerInternalErr(errors.Wrap(err, "error unmarshaling order"))
 	}
 	return &o, nil
 }
 
-// GetOrderIDsByAccount retrieves a list of Order IDs that were created by the
-// account.
-func GetOrderIDsByAccount(db nosql.DB, id string) ([]string, error) {
-	b, err := db.Get(ordersByAccountIDTable, []byte(id))
-	if nosql.IsErrNotFound(err) {
-		return []string{}, nil
-	} else if err != nil {
-		// TODO return a proper API error indicating bad request.
-		return nil, errors.WithStack(err)
-	}
-	var orderIDs []string
-	if err := json.Unmarshal(b, &orderIDs); err != nil {
-		return nil, err
-	}
-	return orderIDs, nil
-}
-
-type acmeOrder struct {
-	Status         string       `json:"status"`
-	Expires        string       `json:"expires,omitempty"`
-	Identifiers    []Identifier `json:"identifiers"`
-	NotBefore      string       `json:"notBefore,omitempty"`
-	NotAfter       string       `json:"notAfter,omitempty"`
-	Error          interface{}  `json:"error,omitempty"`
-	Authorizations []string     `json:"authorizations"`
-	Finalize       string       `json:"finalize"`
-	Certificate    string       `json:"certificate,omitempty"`
-}
-
-// ToACME converts the internal Order type into the public acmeOrder type for
+// toACME converts the internal Order type into the public acmeOrder type for
 // presentation in the ACME protocol.
-func (o *Order) ToACME(db nosql.DB, dir *Directory) (interface{}, error) {
+func (o *order) toACME(db nosql.DB, dir *directory) (*Order, error) {
 	azs := make([]string, len(o.Authorizations))
 	for i, aid := range o.Authorizations {
-		azs[i] = dir.GetAuthz(aid, true)
+		azs[i] = dir.getLink(AuthzLink, true, aid)
 	}
-	ao := &acmeOrder{
+	ao := &Order{
 		Status:         o.Status,
 		Expires:        o.Expires.Format(time.RFC3339),
 		Identifiers:    o.Identifiers,
 		NotBefore:      o.NotBefore.Format(time.RFC3339),
 		NotAfter:       o.NotAfter.Format(time.RFC3339),
 		Authorizations: azs,
-		Finalize:       dir.GetFinalize(o.ID, true),
+		Finalize:       dir.getLink(FinalizeLink, true, o.ID),
+		ID:             o.ID,
 	}
 
 	if o.Certificate != "" {
-		ao.Certificate = dir.GetCertificate(o.Certificate, true)
+		ao.Certificate = dir.getLink(CertificateLink, true, o.Certificate)
 	}
 	return ao, nil
 }

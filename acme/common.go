@@ -8,8 +8,8 @@ import (
 	"github.com/smallstep/cli/crypto/randutil"
 )
 
-// Authority is the interface implemented by a CA authority.
-type Authority interface {
+// SignAuthority is the interface implemented by a CA authority.
+type SignAuthority interface {
 	Sign(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error)
 }
 
@@ -48,5 +48,5 @@ var (
 
 func randID() (val string, err error) {
 	val, err = randutil.Alphanumeric(idLen)
-	return val, errors.Wrap(err, "error generating random alphanumeric ID")
+	return val, ServerInternalErr(errors.Wrap(err, "error generating random alphanumeric ID"))
 }
