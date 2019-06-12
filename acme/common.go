@@ -49,5 +49,8 @@ var (
 
 func randID() (val string, err error) {
 	val, err = randutil.Alphanumeric(idLen)
-	return val, ServerInternalErr(errors.Wrap(err, "error generating random alphanumeric ID"))
+	if err != nil {
+		return "", ServerInternalErr(errors.Wrap(err, "error generating random alphanumeric ID"))
+	}
+	return val, nil
 }

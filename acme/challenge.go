@@ -19,13 +19,14 @@ import (
 // Challenge is a subset of the challenge type containing only those attributes
 // required for responses in the ACME protocol.
 type Challenge struct {
-	Type      string `json:"type"`
-	Status    string `json:"status"`
-	Token     string `json:"token"`
-	Validated string `json:"validated,omitempty"`
-	URL       string `json:"url"`
-	ID        string `json:"-"`
-	AuthzID   string `json:"-"`
+	Type      string      `json:"type"`
+	Status    string      `json:"status"`
+	Token     string      `json:"token"`
+	Validated string      `json:"validated,omitempty"`
+	URL       string      `json:"url"`
+	Error     interface{} `json:"error,omitempty"`
+	ID        string      `json:"-"`
+	AuthzID   string      `json:"-"`
 }
 
 // GetID returns the Challenge ID.
@@ -38,16 +39,28 @@ func (c *Challenge) GetAuthzID() string {
 	return c.AuthzID
 }
 
+type httpGetter func(string) (*http.Response, error)
+type lookupTxt func(string) ([]string, error)
+
+type validateOptions struct {
+	httpGet   httpGetter
+	lookupTxt lookupTxt
+}
+
 // challenge is the interface ACME challenege types must implement.
 type challenge interface {
 	save(db nosql.DB, swap challenge) error
-	validate(nosql.DB, *jose.JSONWebKey) (challenge, error)
+	validate(nosql.DB, *jose.JSONWebKey, validateOptions) (challenge, error)
 	getType() string
+	getValue() string
 	getStatus() string
 	getID() string
 	getAuthzID() string
 	getToken() string
+	clone() *baseChallenge
 	getAccountID() string
+	getValidated() time.Time
+	getCreated() time.Time
 	toACME(nosql.DB, *directory) (*Challenge, error)
 }
 
@@ -60,25 +73,26 @@ type ChallengeOptions struct {
 
 // baseChallenge is the base Challenge type that others build from.
 type baseChallenge struct {
-	ID         string    `json:"id"`
-	AccountID  string    `json:"accountID"`
-	AuthzID    string    `json:"authzID"`
-	Type       string    `json:"type"`
-	Status     string    `json:"status"`
-	Token      string    `json:"token"`
-	Validated  time.Time `json:"validated"`
-	Identifier string    `json:"identifier"`
-	Created    time.Time `json:"created"`
+	ID        string    `json:"id"`
+	AccountID string    `json:"accountID"`
+	AuthzID   string    `json:"authzID"`
+	Type      string    `json:"type"`
+	Status    string    `json:"status"`
+	Token     string    `json:"token"`
+	Value     string    `json:"value"`
+	Validated time.Time `json:"validated"`
+	Created   time.Time `json:"created"`
+	Error     *Error    `json:"error"`
 }
 
 func newBaseChallenge(accountID, authzID string) (*baseChallenge, error) {
 	id, err := randID()
 	if err != nil {
-		return nil, errors.Wrap(err, "error generating random id for ACME challenge")
+		return nil, Wrap(err, "error generating random id for ACME challenge")
 	}
 	token, err := randID()
 	if err != nil {
-		return nil, errors.Wrap(err, "error generating token for ACME challenge")
+		return nil, Wrap(err, "error generating token for ACME challenge")
 	}
 
 	return &baseChallenge{
@@ -87,7 +101,7 @@ func newBaseChallenge(accountID, authzID string) (*baseChallenge, error) {
 		AuthzID:   authzID,
 		Status:    statusPending,
 		Token:     token,
-		Created:   time.Now().UTC(),
+		Created:   time.Now().UTC().Round(time.Second),
 	}, nil
 }
 
@@ -111,6 +125,11 @@ func (bc *baseChallenge) getType() string {
 	return bc.Type
 }
 
+// getValue returns the type of the baseChallenge.
+func (bc *baseChallenge) getValue() string {
+	return bc.Value
+}
+
 // getStatus returns the status of the baseChallenge.
 func (bc *baseChallenge) getStatus() string {
 	return bc.Status
@@ -121,9 +140,14 @@ func (bc *baseChallenge) getToken() string {
 	return bc.Token
 }
 
-// getValidated returns the token of the baseChallenge.
+// getValidated returns the validated time of the baseChallenge.
 func (bc *baseChallenge) getValidated() time.Time {
 	return bc.Validated
+}
+
+// getCreated returns the created time of the baseChallenge.
+func (bc *baseChallenge) getCreated() time.Time {
+	return bc.Created
 }
 
 // toACME converts the internal Challenge type into the public acmeChallenge
@@ -138,6 +162,9 @@ func (bc *baseChallenge) toACME(db nosql.DB, dir *directory) (*Challenge, error)
 	}
 	if !bc.Validated.IsZero() {
 		ac.Validated = bc.Validated.Format(time.RFC3339)
+	}
+	if bc.Error != nil {
+		ac.Error = bc.Error.toACME()
 	}
 	return ac, nil
 }
@@ -169,7 +196,7 @@ func (bc *baseChallenge) save(db nosql.DB, old challenge) error {
 		return ServerInternalErr(errors.Wrap(err, "error saving acme challenge"))
 	case !swapped:
 		return ServerInternalErr(errors.New("error saving acme challenge; " +
-			" acme challenge has changed since last read"))
+			"acme challenge has changed since last read"))
 	default:
 		return nil
 	}
@@ -178,6 +205,17 @@ func (bc *baseChallenge) save(db nosql.DB, old challenge) error {
 func (bc *baseChallenge) clone() *baseChallenge {
 	u := *bc
 	return &u
+}
+
+func (bc *baseChallenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validateOptions) (challenge, error) {
+	return nil, ServerInternalErr(errors.New("unimplemented"))
+}
+
+func (bc *baseChallenge) storeAndReturnError(db nosql.DB, err *Error) error {
+	clone := bc.clone()
+	clone.Error = err
+	clone.save(db, bc)
+	return err
 }
 
 // unmarshalChallenge unmarshals a challenge type into the correct sub-type.
@@ -191,19 +229,19 @@ func unmarshalChallenge(data []byte) (challenge, error) {
 
 	switch getType.Type {
 	case "dns-01":
-		var ch dns01Challenge
-		if err := json.Unmarshal(data, &ch); err != nil {
+		var bc baseChallenge
+		if err := json.Unmarshal(data, &bc); err != nil {
 			return nil, ServerInternalErr(errors.Wrap(err, "error unmarshaling "+
 				"challenge type into dns01Challenge"))
 		}
-		return &ch, nil
+		return &dns01Challenge{&bc}, nil
 	case "http-01":
-		var ch http01Challenge
-		if err := json.Unmarshal(data, &ch); err != nil {
+		var bc baseChallenge
+		if err := json.Unmarshal(data, &bc); err != nil {
 			return nil, ServerInternalErr(errors.Wrap(err, "error unmarshaling "+
 				"challenge type into http01Challenge"))
 		}
-		return &ch, nil
+		return &http01Challenge{&bc}, nil
 	default:
 		return nil, ServerInternalErr(errors.Errorf("unexpected challenge type %s", getType.Type))
 	}
@@ -221,7 +259,7 @@ func newHTTP01Challenge(db nosql.DB, ops ChallengeOptions) (challenge, error) {
 		return nil, err
 	}
 	bc.Type = "http-01"
-	bc.Identifier = ops.Identifier.Value
+	bc.Value = ops.Identifier.Value
 
 	hc := &http01Challenge{bc}
 	if err := hc.save(db, nil); err != nil {
@@ -233,19 +271,19 @@ func newHTTP01Challenge(db nosql.DB, ops ChallengeOptions) (challenge, error) {
 // Validate attempts to validate the challenge. If the challenge has been
 // satisfactorily validated, the 'status' and 'validated' attributes are
 // updated.
-func (hc *http01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey) (challenge, error) {
+func (hc *http01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validateOptions) (challenge, error) {
 	// If already valid or invalid then return without performing validation.
 	if hc.getStatus() == statusValid {
 		return hc, nil
 	} else if hc.getStatus() == statusInvalid {
 		return nil, MalformedErr(errors.New("challenge already has invalid status"))
 	}
-	url := fmt.Sprintf("http://%s/.well-known/acme-challenge/%s", hc.Identifier, hc.Token)
+	url := fmt.Sprintf("http://%s/.well-known/acme-challenge/%s", hc.Value, hc.Token)
 
-	resp, err := http.Get(url)
+	resp, err := vo.httpGet(url)
 	if err != nil {
-		// TODO store the error cause on the challenge.
-		return nil, DNSErr(errors.Wrapf(err, "error doing http GET for url %s", url))
+		return nil, hc.storeAndReturnError(db,
+			ConnectionErr(errors.Wrapf(err, "error doing http GET for url %s", url)))
 	}
 	defer resp.Body.Close()
 
@@ -261,14 +299,15 @@ func (hc *http01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey) (challeng
 		return nil, err
 	}
 	if keyAuth != expected {
-		return nil, RejectedIdentifierErr(errors.Errorf("keyAuthorization "+
-			"does not match; expected %s, but got %s", expected, keyAuth))
+		return nil, hc.storeAndReturnError(db,
+			RejectedIdentifierErr(errors.Errorf("keyAuthorization does not match; "+
+				"expected %s, but got %s", expected, keyAuth)))
 	}
 
 	// Update and store the challenge.
 	upd := &http01Challenge{hc.baseChallenge.clone()}
 	upd.Status = statusValid
-	upd.Validated = time.Now().UTC()
+	upd.Validated = time.Now().UTC().Round(time.Second)
 
 	if err := upd.save(db, hc); err != nil {
 		return nil, err
@@ -288,9 +327,9 @@ func newDNS01Challenge(db nosql.DB, ops ChallengeOptions) (challenge, error) {
 		return nil, err
 	}
 	bc.Type = "dns-01"
-	bc.Identifier = ops.Identifier.Value
+	bc.Value = ops.Identifier.Value
 
-	dc := &http01Challenge{bc}
+	dc := &dns01Challenge{bc}
 	if err := dc.save(db, nil); err != nil {
 		return nil, err
 	}
@@ -309,7 +348,7 @@ func keyAuthorization(token string, jwk *jose.JSONWebKey) (string, error) {
 // validate attempts to validate the challenge. If the challenge has been
 // satisfactorily validated, the 'status' and 'validated' attributes are
 // updated.
-func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey) (challenge, error) {
+func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validateOptions) (challenge, error) {
 	// If already valid or invalid then return without performing validation.
 	if dc.getStatus() == statusValid {
 		return dc, nil
@@ -321,11 +360,11 @@ func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey) (challenge
 	if err != nil {
 		return nil, err
 	}
-	txtRecords, err := net.LookupTXT(dc.Identifier)
+	txtRecords, err := net.LookupTXT(dc.Value)
 	if err != nil {
 		// TODO store the error cause on the challenge.
 		return nil, DNSErr(errors.Wrapf(err, "error looking up TXT "+
-			"records for domain %s", dc.Identifier))
+			"records for domain %s", dc.Value))
 	}
 
 	var found bool
@@ -358,7 +397,7 @@ func getChallenge(db nosql.DB, id string) (challenge, error) {
 	if nosql.IsErrNotFound(err) {
 		return nil, MalformedErr(errors.Wrapf(err, "challenge %s not found", id))
 	} else if err != nil {
-		return nil, ServerInternalErr(errors.Wrap(err, "error loading challenge"))
+		return nil, ServerInternalErr(errors.Wrap(err, "error loading challenge from db"))
 	}
 	ch, err := unmarshalChallenge(b)
 	if err != nil {

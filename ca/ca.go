@@ -3,18 +3,23 @@ package ca
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"reflect"
 
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/acme"
+	acmeAPI "github.com/smallstep/certificates/acme/api"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/monitoring"
 	"github.com/smallstep/certificates/server"
+	"github.com/smallstep/nosql"
 )
 
 type options struct {
@@ -58,11 +63,12 @@ func WithDatabase(db db.AuthDB) Option {
 // CA is the type used to build the complete certificate authority. It builds
 // the HTTP server, set ups the middlewares and the HTTP handlers.
 type CA struct {
-	auth    *authority.Authority
-	config  *authority.Config
-	srv     *server.Server
-	opts    *options
-	renewer *TLSRenewer
+	auth     *authority.Authority
+	acmeAuth *acme.Authority
+	config   *authority.Config
+	srv      *server.Server
+	opts     *options
+	renewer  *TLSRenewer
 }
 
 // New creates and initializes the CA with the given configuration and options.
@@ -100,18 +106,34 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 	mux := chi.NewRouter()
 	handler := http.Handler(mux)
 
-	// Add api endpoints in / and /1.0
+	// Add regular CA api endpoints in / and /1.0
 	routerHandler := api.New(auth)
 	routerHandler.Route(mux)
-	mux.Route("/acme", func(r chi.Router) {
-		routerHandler.RouteACME(r)
+	mux.Route("/", func(r chi.Router) {
+		routerHandler.Route(r)
 	})
 	mux.Route("/1.0", func(r chi.Router) {
-		routerHandler.RouteACME(r)
+		routerHandler.Route(r)
 	})
 
+	//Add ACME api endpoints in /acme and /1.0/acme
+	dns := config.DNSNames[0]
+	u, err := url.Parse(config.Address)
+	if err != nil {
+		return nil, err
+	}
+	port := u.Port()
+	if port != "" && port != "443" {
+		dns = fmt.Sprintf("%s:%s", dns, port)
+	}
+	acmeAuth := acme.NewAuthority(auth.GetDatabase().(nosql.DB), dns, "acme", auth)
+	acmeRouterHandler := acmeAPI.New(acmeAuth)
+	acmeRouterHandler.Route(mux)
+	mux.Route("/acme", func(r chi.Router) {
+		routerHandler.Route(r)
+	})
 	mux.Route("/1.0/acme", func(r chi.Router) {
-		routerHandler.RouteACME(r)
+		routerHandler.Route(r)
 	})
 
 	// Add monitoring if configured

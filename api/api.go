@@ -18,10 +18,8 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/cli/crypto/tlsutil"
 )
@@ -42,8 +40,6 @@ type Authority interface {
 	GetEncryptedKey(kid string) (string, error)
 	GetRoots() (federation []*x509.Certificate, err error)
 	GetFederation() ([]*x509.Certificate, error)
-	GetDatabase() db.AuthDB
-	acme.ACME
 }
 
 // TimeDuration is an alias of provisioner.TimeDuration
@@ -162,7 +158,6 @@ type Router interface {
 // endpoints will implement.
 type RouterHandler interface {
 	Route(r Router)
-	RouteACME(r Router)
 }
 
 // HealthResponse is the response object that returns the health of the server.
@@ -254,30 +249,6 @@ func (h *caHandler) Route(r Router) {
 	r.MethodFunc("GET", "/federation", h.Federation)
 	// For compatibility with old code:
 	r.MethodFunc("POST", "/re-sign", h.Renew)
-}
-
-func (h *caHandler) RouteACME(r Router) {
-	getLink := h.Authority.GetLink
-	// Standard ACME API
-	r.MethodFunc("GET", getLink(acme.NewNonceLink, false), h.addNonce(h.GetNonce))
-	r.MethodFunc("GET", getLink(acme.DirectoryLink, false), h.addNonce(h.GetDirectory))
-
-	extractPayloadByJWK := func(next nextHTTP) nextHTTP {
-		return h.addNonce(h.addDirectory(h.verifyContentType(h.parseJWS(h.validateJWS(h.extractJWK(h.verifyAndExtractJWSPayload(next)))))))
-	}
-	extractPayloadByKid := func(next nextHTTP) nextHTTP {
-		return h.addNonce(h.addDirectory(h.verifyContentType(h.parseJWS(h.validateJWS(h.lookupJWK(h.verifyAndExtractJWSPayload(next)))))))
-	}
-
-	r.MethodFunc("POST", getLink(acme.NewAccountLink, false), extractPayloadByJWK(h.NewAccount))
-	r.MethodFunc("POST", getLink(acme.AccountLink, false, "{accID}"), extractPayloadByKid(h.isPostAsGet(h.UpdateAccount)))
-	r.MethodFunc("POST", getLink(acme.NewOrderLink, false), extractPayloadByKid(h.NewOrder))
-	r.MethodFunc("POST", getLink(acme.OrderLink, false, "{ordID}"), extractPayloadByKid(h.isPostAsGet(h.GetOrder)))
-	r.MethodFunc("POST", getLink(acme.OrdersByAccountLink, false, "{accID}"), extractPayloadByKid(h.isPostAsGet(h.GetOrdersByAccount)))
-	r.MethodFunc("POST", getLink(acme.FinalizeLink, false, "{ordID}"), extractPayloadByKid(h.FinalizeOrder))
-	r.MethodFunc("POST", getLink(acme.AuthzLink, false, "{authzID}"), extractPayloadByKid(h.isPostAsGet(h.GetAuthz)))
-	r.MethodFunc("POST", getLink(acme.ChallengeLink, false, "{chID}"), extractPayloadByKid(h.GetChallenge))
-	r.MethodFunc("POST", getLink(acme.CertificateLink, false, "{certID}"), extractPayloadByKid(h.isPostAsGet(h.GetCertificate)))
 }
 
 // Health is an HTTP handler that returns the status of the server.

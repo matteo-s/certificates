@@ -90,9 +90,9 @@ func (l Link) String() string {
 func (d *directory) getLink(typ Link, abs bool, inputs ...string) string {
 	var link string
 	switch typ {
-	case NewNonceLink, NewAccountLink, NewOrderLink, NewAuthzLink, DirectoryLink, RevokeCertLink, KeyChangeLink:
+	case NewNonceLink, NewAccountLink, NewOrderLink, NewAuthzLink, DirectoryLink, KeyChangeLink:
 		link = fmt.Sprintf("%s", typ.String())
-	case AccountLink, OrderLink, AuthzLink, ChallengeLink, CertificateLink:
+	case AccountLink, OrderLink, AuthzLink, ChallengeLink, CertificateLink, RevokeCertLink:
 		link = fmt.Sprintf("%s/%s", typ.String(), inputs[0])
 	case OrdersByAccountLink:
 		link = fmt.Sprintf("%s/%s/orders", AccountLink.String(), inputs[0])

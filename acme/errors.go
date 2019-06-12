@@ -11,6 +11,7 @@ func AccountDoesNotExistErr(err error) *Error {
 	return &Error{
 		Type:   accountDoesNotExistErr,
 		Detail: "Account does not exist",
+		Status: 404,
 		Err:    err,
 	}
 }
@@ -20,6 +21,7 @@ func AlreadyRevokedErr(err error) *Error {
 	return &Error{
 		Type:   alreadyRevokedErr,
 		Detail: "Certificate already revoked",
+		Status: 400,
 		Err:    err,
 	}
 }
@@ -29,6 +31,7 @@ func BadCSRErr(err error) *Error {
 	return &Error{
 		Type:   badCSRErr,
 		Detail: "The CSR is unacceptable",
+		Status: 400,
 		Err:    err,
 	}
 }
@@ -38,6 +41,7 @@ func BadNonceErr(err error) *Error {
 	return &Error{
 		Type:   badNonceErr,
 		Detail: "Unacceptable anti-replay nonce",
+		Status: 400,
 		Err:    err,
 	}
 }
@@ -47,6 +51,7 @@ func BadPublicKeyErr(err error) *Error {
 	return &Error{
 		Type:   badPublicKeyErr,
 		Detail: "The jws was signed by a public key the server does not support",
+		Status: 400,
 		Err:    err,
 	}
 }
@@ -56,6 +61,7 @@ func BadRevocationReasonErr(err error) *Error {
 	return &Error{
 		Type:   badRevocationReasonErr,
 		Detail: "The revocation reason provided is not allowed by the server",
+		Status: 400,
 		Err:    err,
 	}
 }
@@ -65,6 +71,7 @@ func BadSignatureAlgorithmErr(err error) *Error {
 	return &Error{
 		Type:   badSignatureAlgorithmErr,
 		Detail: "The JWS was signed with an algorithm the server does not support",
+		Status: 400,
 		Err:    err,
 	}
 }
@@ -74,6 +81,7 @@ func CaaErr(err error) *Error {
 	return &Error{
 		Type:   caaErr,
 		Detail: "Certification Authority Authorization (CAA) records forbid the CA from issuing a certificate",
+		Status: 400,
 		Err:    err,
 	}
 }
@@ -83,6 +91,7 @@ func CompoundErr(err error) *Error {
 	return &Error{
 		Type:   compoundErr,
 		Detail: "Specific error conditions are indicated in the “subproblems” array",
+		Status: 400,
 		Err:    err,
 	}
 }
@@ -92,6 +101,7 @@ func ConnectionErr(err error) *Error {
 	return &Error{
 		Type:   connectionErr,
 		Detail: "The server could not connect to validation target",
+		Status: 400,
 		Err:    err,
 	}
 }
@@ -101,6 +111,7 @@ func DNSErr(err error) *Error {
 	return &Error{
 		Type:   dnsErr,
 		Detail: "There was a problem with a DNS query during identifier validation",
+		Status: 400,
 		Err:    err,
 	}
 }
@@ -110,6 +121,7 @@ func ExternalAccountRequiredErr(err error) *Error {
 	return &Error{
 		Type:   externalAccountRequiredErr,
 		Detail: "The request must include a value for the \"externalAccountBinding\" field",
+		Status: 400,
 		Err:    err,
 	}
 }
@@ -119,6 +131,7 @@ func IncorrectResponseErr(err error) *Error {
 	return &Error{
 		Type:   incorrectResponseErr,
 		Detail: "Response received didn't match the challenge's requirements",
+		Status: 400,
 		Err:    err,
 	}
 }
@@ -128,6 +141,7 @@ func InvalidContactErr(err error) *Error {
 	return &Error{
 		Type:   invalidContactErr,
 		Detail: "A contact URL for an account was invalid",
+		Status: 400,
 		Err:    err,
 	}
 }
@@ -137,6 +151,7 @@ func MalformedErr(err error) *Error {
 	return &Error{
 		Type:   malformedErr,
 		Detail: "The request message was malformed",
+		Status: 400,
 		Err:    err,
 	}
 }
@@ -146,6 +161,7 @@ func OrderNotReadyErr(err error) *Error {
 	return &Error{
 		Type:   orderNotReadyErr,
 		Detail: "The request attempted to finalize an order that is not ready to be finalized",
+		Status: 400,
 		Err:    err,
 	}
 }
@@ -155,6 +171,7 @@ func RateLimitedErr(err error) *Error {
 	return &Error{
 		Type:   rateLimitedErr,
 		Detail: "The request exceeds a rate limit",
+		Status: 400,
 		Err:    err,
 	}
 }
@@ -164,6 +181,7 @@ func RejectedIdentifierErr(err error) *Error {
 	return &Error{
 		Type:   rejectedIdentifierErr,
 		Detail: "The server will not issue certificates for the identifier",
+		Status: 400,
 		Err:    err,
 	}
 }
@@ -173,6 +191,7 @@ func ServerInternalErr(err error) *Error {
 	return &Error{
 		Type:   serverInternalErr,
 		Detail: "The server experienced an internal error",
+		Status: 500,
 		Err:    err,
 	}
 }
@@ -182,6 +201,7 @@ func TLSErr(err error) *Error {
 	return &Error{
 		Type:   tlsErr,
 		Detail: "The server received a TLS error during validation",
+		Status: 400,
 		Err:    err,
 	}
 }
@@ -191,6 +211,7 @@ func UnauthorizedErr(err error) *Error {
 	return &Error{
 		Type:   unauthorizedErr,
 		Detail: "The client lacks sufficient authorization",
+		Status: 401,
 		Err:    err,
 	}
 }
@@ -200,6 +221,7 @@ func UnsupportedContactErr(err error) *Error {
 	return &Error{
 		Type:   unsupportedContactErr,
 		Detail: "A contact URL for an account used an unsupported protocol scheme",
+		Status: 400,
 		Err:    err,
 	}
 }
@@ -209,6 +231,7 @@ func UnsupportedIdentifierErr(err error) *Error {
 	return &Error{
 		Type:   unsupportedIdentifierErr,
 		Detail: "An identifier is of an unsupported type",
+		Status: 400,
 		Err:    err,
 	}
 }
@@ -218,6 +241,7 @@ func UserActionRequiredErr(err error) *Error {
 	return &Error{
 		Type:   userActionRequiredErr,
 		Detail: "Visit the “instance” URL and take actions specified there",
+		Status: 400,
 		Err:    err,
 	}
 }
@@ -341,6 +365,23 @@ type Error struct {
 	Status     int
 	Sub        []*Error
 	Identifier *Identifier
+}
+
+// Wrap attempts to wrap the internal error.
+func Wrap(err error, wrap string) *Error {
+	switch e := err.(type) {
+	case nil:
+		return nil
+	case *Error:
+		if e.Err == nil {
+			e.Err = errors.New(wrap + "; " + e.Detail)
+		} else {
+			e.Err = errors.Wrap(e.Err, wrap)
+		}
+		return e
+	default:
+		return ServerInternalErr(errors.Wrap(err, wrap))
+	}
 }
 
 // Error implements the error interface.

@@ -4,16 +4,13 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
-	"net/url"
 	"sync"
 	"time"
 
-	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/x509util"
-	"github.com/smallstep/nosql"
 )
 
 const legacyAuthority = "step-certificate-authority"
@@ -28,7 +25,6 @@ type Authority struct {
 	startTime            time.Time
 	provisioners         *provisioner.Collection
 	db                   db.AuthDB
-	acme.ACME
 	// Do not re-initialize
 	initOnce bool
 }
@@ -80,18 +76,6 @@ func (a *Authority) init() error {
 			return err
 		}
 	}
-
-	// Set the ACME sub-authority.
-	u, err := url.Parse(a.config.Address)
-	if err != nil {
-		return err
-	}
-	dns := a.config.DNSNames[0]
-	port := u.Port()
-	if port != "" && port != "443" {
-		dns = dns + ":" + port
-	}
-	a.ACME = acme.NewAuthority(a.db.(nosql.DB), dns, "acme", a)
 
 	// Load the root certificates and add them to the certificate store
 	a.rootX509Certs = make([]*x509.Certificate, len(a.config.Root))

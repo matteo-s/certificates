@@ -2,14 +2,16 @@ package acme
 
 import (
 	"crypto/x509"
+	"net"
+	"net/http"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/cli/jose"
 	"github.com/smallstep/nosql"
 )
 
-// ACME is the acme authority interface.
-type ACME interface {
+// Interface is the acme authority interface.
+type Interface interface {
 	GetLink(Link, bool, ...string) string
 	GetDirectory() *Directory
 	NewNonce() (string, error)
@@ -100,7 +102,7 @@ func (a *Authority) GetAccount(id string) (*Account, error) {
 }
 
 // DeactivateAccount deactivates an ACME account.
-func (a *Authority) DeactivateAccount(id string, contact []string) (*Account, error) {
+func (a *Authority) DeactivateAccount(id string) (*Account, error) {
 	acc, err := getAccountByID(a.db, id)
 	if err != nil {
 		return nil, err
@@ -216,7 +218,10 @@ func (a *Authority) ValidateChallenge(accID, chID string, jwk *jose.JSONWebKey) 
 	if accID != ch.getAccountID() {
 		return nil, UnauthorizedErr(errors.New("account does not own challenge"))
 	}
-	ch, err = ch.validate(a.db, jwk)
+	ch, err = ch.validate(a.db, jwk, validateOptions{
+		httpGet:   http.Get,
+		lookupTxt: net.LookupTXT,
+	})
 	if err != nil {
 		return nil, err
 	}
