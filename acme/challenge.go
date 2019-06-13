@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -353,20 +352,20 @@ func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validat
 	if dc.getStatus() == statusValid {
 		return dc, nil
 	} else if dc.getStatus() == statusInvalid {
-		return nil, MalformedErr(errors.New("challenge has already been marked invalid"))
+		return nil, MalformedErr(errors.New("challenge already has invalid status"))
+	}
+
+	txtRecords, err := vo.lookupTxt(dc.Value)
+	if err != nil {
+		return nil, dc.storeAndReturnError(db,
+			DNSErr(errors.Wrapf(err, "error looking up TXT "+
+				"records for domain %s", dc.Value)))
 	}
 
 	expectedKeyAuth, err := keyAuthorization(dc.Token, jwk)
 	if err != nil {
 		return nil, err
 	}
-	txtRecords, err := net.LookupTXT(dc.Value)
-	if err != nil {
-		// TODO store the error cause on the challenge.
-		return nil, DNSErr(errors.Wrapf(err, "error looking up TXT "+
-			"records for domain %s", dc.Value))
-	}
-
 	var found bool
 	for _, r := range txtRecords {
 		if r == expectedKeyAuth {
@@ -374,10 +373,10 @@ func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validat
 			break
 		}
 	}
-
 	if !found {
-		return nil, RejectedIdentifierErr(errors.Errorf("keyAuthorization "+
-			"does not match; want %s, but got %s", expectedKeyAuth, txtRecords))
+		return nil, dc.storeAndReturnError(db,
+			RejectedIdentifierErr(errors.Errorf("keyAuthorization "+
+				"does not match; expected %s, but got %s", expectedKeyAuth, txtRecords)))
 	}
 
 	// Update and store the challenge.

@@ -14,12 +14,12 @@ var defaultExpiryDuration = time.Hour * 24
 // Authz is a subset of the Authz type containing only those attributes
 // required for responses in the ACME protocol.
 type Authz struct {
-	Identifier Identifier    `json:"identifier"`
-	Status     string        `json:"status"`
-	Expires    string        `json:"expires"`
-	Challenges []interface{} `json:"challenges"`
-	Wildcard   bool          `json:"wildcard"`
-	ID         string        `json:"-"`
+	Identifier Identifier   `json:"identifier"`
+	Status     string       `json:"status"`
+	Expires    string       `json:"expires"`
+	Challenges []*Challenge `json:"challenges"`
+	Wildcard   bool         `json:"wildcard"`
+	ID         string       `json:"-"`
 }
 
 // GetID returns the Authz ID.
@@ -30,12 +30,16 @@ func (a *Authz) GetID() string {
 // authz is the interface that the various authz types must implement.
 type authz interface {
 	save(nosql.DB, authz) error
+	clone() *baseAuthz
 	getID() string
 	getAccountID() string
 	getType() string
+	getIdentifier() Identifier
 	getStatus() string
 	getExpiry() time.Time
-	isWildcard() bool
+	getWildcard() bool
+	getChallenges() []string
+	getCreated() time.Time
 	updateStatus(db nosql.DB) (authz, error)
 	toACME(nosql.DB, *directory) (*Authz, error)
 }
@@ -49,7 +53,8 @@ type baseAuthz struct {
 	Expires    time.Time  `json:"expires"`
 	Challenges []string   `json:"challenges"`
 	Wildcard   bool       `json:"wildcard"`
-	Created    time.Time
+	Created    time.Time  `json:"created"`
+	Error      *Error     `json:"error"`
 }
 
 func newBaseAuthz(accID string, identifier Identifier) (*baseAuthz, error) {
@@ -62,8 +67,8 @@ func newBaseAuthz(accID string, identifier Identifier) (*baseAuthz, error) {
 		ID:         id,
 		AccountID:  accID,
 		Status:     statusPending,
-		Created:    time.Now().UTC(),
-		Expires:    time.Now().UTC().Add(defaultExpiryDuration),
+		Created:    time.Now().UTC().Round(time.Second),
+		Expires:    time.Now().UTC().Add(defaultExpiryDuration).Round(time.Second),
 		Identifier: identifier,
 	}
 
@@ -103,9 +108,14 @@ func (ba *baseAuthz) getStatus() string {
 	return ba.Status
 }
 
-// isWildcard returns true if the authz identifier has a '*', false otherwise.
-func (ba *baseAuthz) isWildcard() bool {
+// getWildcard returns true if the authz identifier has a '*', false otherwise.
+func (ba *baseAuthz) getWildcard() bool {
 	return ba.Wildcard
+}
+
+// getChallenges returns the authz challenge IDs.
+func (ba *baseAuthz) getChallenges() []string {
+	return ba.Challenges
 }
 
 // getExpiry returns the expiration time of the authz.
@@ -113,10 +123,15 @@ func (ba *baseAuthz) getExpiry() time.Time {
 	return ba.Expires
 }
 
+// getCreated returns the created time of the authz.
+func (ba *baseAuthz) getCreated() time.Time {
+	return ba.Created
+}
+
 // toACME converts the internal Authz type into the public acmeAuthz type for
 // presentation in the ACME protocol.
 func (ba *baseAuthz) toACME(db nosql.DB, dir *directory) (*Authz, error) {
-	var chs = make([]interface{}, len(ba.Challenges))
+	var chs = make([]*Challenge, len(ba.Challenges))
 	for i, chID := range ba.Challenges {
 		ch, err := getChallenge(db, chID)
 		if err != nil {
@@ -131,7 +146,7 @@ func (ba *baseAuthz) toACME(db nosql.DB, dir *directory) (*Authz, error) {
 		Identifier: ba.Identifier,
 		Status:     ba.getStatus(),
 		Challenges: chs,
-		Wildcard:   ba.isWildcard(),
+		Wildcard:   ba.getWildcard(),
 		Expires:    ba.Expires.Format(time.RFC3339),
 		ID:         ba.ID,
 	}, nil
@@ -155,10 +170,10 @@ func (ba *baseAuthz) save(db nosql.DB, old authz) error {
 	_, swapped, err := db.CmpAndSwap(authzTable, []byte(ba.ID), oldB, newB)
 	switch {
 	case err != nil:
-		return ServerInternalErr(errors.Wrapf(err, "error storing authz with ID %s", ba.ID))
+		return ServerInternalErr(errors.Wrapf(err, "error storing authz"))
 	case !swapped:
-		return ServerInternalErr(errors.Errorf("error storing authz with ID %s; "+
-			"value has changed since last read", ba.ID))
+		return ServerInternalErr(errors.Errorf("error storing authz; " +
+			"value has changed since last read"))
 	default:
 		return nil
 	}
@@ -169,6 +184,17 @@ func (ba *baseAuthz) clone() *baseAuthz {
 	return &u
 }
 
+func (ba *baseAuthz) storeAndReturnError(db nosql.DB, err *Error) error {
+	clone := ba.clone()
+	clone.Error = err
+	clone.save(db, ba)
+	return err
+}
+
+func (ba *baseAuthz) parent() authz {
+	return &dnsAuthz{ba}
+}
+
 // updateStatus attempts to update the status on a baseAuthz and stores the
 // updating object if necessary.
 func (ba *baseAuthz) updateStatus(db nosql.DB) (authz, error) {
@@ -177,22 +203,14 @@ func (ba *baseAuthz) updateStatus(db nosql.DB) (authz, error) {
 	now := time.Now().UTC()
 	switch ba.Status {
 	case statusInvalid:
-		return ba, nil
+		return ba.parent(), nil
 	case statusValid:
-		return ba, nil
-	case statusReady:
-		// check expiry
-		if now.After(ba.Expires) {
-			newAuthz.Status = statusInvalid
-			// TODO add something to error/problem indicating expiration.
-			break
-		}
-		return ba, nil
+		return ba.parent(), nil
 	case statusPending:
 		// check expiry
 		if now.After(ba.Expires) {
 			newAuthz.Status = statusInvalid
-			// TODO add something to error/problem indicating expiration.
+			newAuthz.Error = MalformedErr(errors.New("authz has expired"))
 			break
 		}
 
@@ -208,18 +226,18 @@ func (ba *baseAuthz) updateStatus(db nosql.DB) (authz, error) {
 			}
 		}
 
-		if isValid {
-			newAuthz.Status = statusValid
-			break
+		if !isValid {
+			return ba.parent(), nil
 		}
-		// Still pending, so do nothing.
-		return ba, nil
+		newAuthz.Status = statusValid
+	default:
+		return nil, ServerInternalErr(errors.Errorf("unrecognized status for authz: %s", ba.Status))
 	}
 
 	if err := newAuthz.save(db, ba); err != nil {
 		return ba, err
 	}
-	return newAuthz, nil
+	return newAuthz.parent(), nil
 }
 
 // unmarshalAuthz unmarshals an authz type into the correct sub-type.
@@ -233,19 +251,19 @@ func unmarshalAuthz(data []byte) (authz, error) {
 
 	switch getType.Identifier.Type {
 	case "dns":
-		var az DNSAuthz
-		if err := json.Unmarshal(data, &az); err != nil {
-			return nil, ServerInternalErr(errors.Wrap(err, "error unmarshaling authz type into DNSAuthz"))
+		var ba baseAuthz
+		if err := json.Unmarshal(data, &ba); err != nil {
+			return nil, ServerInternalErr(errors.Wrap(err, "error unmarshaling authz type into dnsAuthz"))
 		}
-		return &az, nil
+		return &dnsAuthz{&ba}, nil
 	default:
 		return nil, ServerInternalErr(errors.Errorf("unexpected authz type %s",
 			getType.Identifier.Type))
 	}
 }
 
-// DNSAuthz represents a dns acme authorization.
-type DNSAuthz struct {
+// dnsAuthz represents a dns acme authorization.
+type dnsAuthz struct {
 	*baseAuthz
 }
 
@@ -256,7 +274,7 @@ func newAuthz(db nosql.DB, accID string, identifier Identifier) (a authz, err er
 	case "dns":
 		a, err = newDNSAuthz(db, accID, identifier)
 	default:
-		err = MalformedErr(errors.Errorf("unexpected authorization type %s",
+		err = MalformedErr(errors.Errorf("unexpected authz type %s",
 			identifier.Type))
 	}
 	return
@@ -274,18 +292,18 @@ func newDNSAuthz(db nosql.DB, accID string, identifier Identifier) (authz, error
 		AuthzID:    ba.ID,
 		Identifier: identifier})
 	if err != nil {
-		return nil, err
+		return nil, Wrap(err, "error creating http challenge")
 	}
 	ch2, err := newDNS01Challenge(db, ChallengeOptions{
 		AccountID:  accID,
 		AuthzID:    ba.ID,
 		Identifier: identifier})
 	if err != nil {
-		return nil, err
+		return nil, Wrap(err, "error creating dns challenge")
 	}
 	ba.Challenges = []string{ch1.getID(), ch2.getID()}
 
-	da := &DNSAuthz{ba}
+	da := &dnsAuthz{ba}
 	if err := da.save(db, nil); err != nil {
 		return nil, err
 	}

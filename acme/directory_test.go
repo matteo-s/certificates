@@ -40,7 +40,7 @@ func TestDirectoryGetLink(t *testing.T) {
 	assert.Equals(t, dir.getLink(NewAuthzLink, false), "new-authz")
 
 	assert.Equals(t, dir.getLink(AuthzLink, true, id), "https://ca.smallstep.com/acme/authz/1234")
-	assert.Equals(t, dir.getLink(AuthzLink, false, id), "new-authz/1234")
+	assert.Equals(t, dir.getLink(AuthzLink, false, id), "authz/1234")
 
 	assert.Equals(t, dir.getLink(DirectoryLink, true), "https://ca.smallstep.com/acme/directory")
 	assert.Equals(t, dir.getLink(DirectoryLink, false), "directory")
