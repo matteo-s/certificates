@@ -231,7 +231,7 @@ func (ba *baseAuthz) updateStatus(db nosql.DB) (authz, error) {
 		}
 		newAuthz.Status = statusValid
 	default:
-		return nil, ServerInternalErr(errors.Errorf("unrecognized status for authz: %s", ba.Status))
+		return nil, ServerInternalErr(errors.Errorf("unrecognized authz status: %s", ba.Status))
 	}
 
 	if err := newAuthz.save(db, ba); err != nil {

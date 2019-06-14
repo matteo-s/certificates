@@ -44,12 +44,12 @@ type order struct {
 	ID             string       `json:"id"`
 	AccountID      string       `json:"accountID"`
 	Created        time.Time    `json:"created"`
-	Status         string       `json:"status"`
 	Expires        time.Time    `json:"expires,omitempty"`
+	Status         string       `json:"status"`
 	Identifiers    []Identifier `json:"identifiers"`
 	NotBefore      time.Time    `json:"notBefore,omitempty"`
 	NotAfter       time.Time    `json:"notAfter,omitempty"`
-	Error          interface{}  `json:"error,omitempty"`
+	Error          *Error       `json:"error,omitempty"`
 	Authorizations []string     `json:"authorizations"`
 	Certificate    string       `json:"certificate,omitempty"`
 }
@@ -70,13 +70,13 @@ func newOrder(db nosql.DB, ops OrderOptions) (*order, error) {
 		authzs[i] = authz.getID()
 	}
 
-	now := time.Now().UTC()
+	now := time.Now().UTC().Round(time.Second)
 	o := &order{
 		ID:             id,
 		AccountID:      ops.AccountID,
 		Created:        now,
 		Status:         statusPending,
-		Expires:        now.Add(defaultOrderExpiry),
+		Expires:        now.Add(defaultOrderExpiry).Round(time.Second),
 		Identifiers:    ops.Identifiers,
 		NotBefore:      ops.NotBefore,
 		NotAfter:       ops.NotAfter,
@@ -86,36 +86,47 @@ func newOrder(db nosql.DB, ops OrderOptions) (*order, error) {
 		return nil, err
 	}
 
-	// TODO should we delete the Order if there are errors downstream?
-
 	// Update the "order IDs by account ID" index //
-	orderIDs, err := getOrderIDsByAccount(db, ops.AccountID)
+	oids, err := getOrderIDsByAccount(db, ops.AccountID)
 	if err != nil {
 		return nil, err
 	}
-	var oldb []byte
-	if len(orderIDs) == 0 {
+	newOids := append(oids, o.ID)
+	if err = orderIDs(newOids).save(db, oids, o.AccountID); err != nil {
+		db.Del(orderTable, []byte(o.ID))
+		return nil, err
+	}
+	return o, nil
+}
+
+type orderIDs []string
+
+func (oids orderIDs) save(db nosql.DB, old orderIDs, accID string) error {
+	var (
+		err  error
+		oldb []byte
+	)
+	if len(old) == 0 {
 		oldb = nil
 	} else {
-		oldb, err = json.Marshal(orderIDs)
+		oldb, err = json.Marshal(old)
 		if err != nil {
-			return nil, ServerInternalErr(errors.Wrap(err, "error marshaling old order IDs slice"))
+			return ServerInternalErr(errors.Wrap(err, "error marshaling old order IDs slice"))
 		}
 	}
-	newOrderIDs := append(orderIDs, o.ID)
-	newb, err := json.Marshal(newOrderIDs)
+	newb, err := json.Marshal(oids)
 	if err != nil {
-		return nil, ServerInternalErr(errors.Wrap(err, "error marshaling new order IDs slice"))
+		return ServerInternalErr(errors.Wrap(err, "error marshaling new order IDs slice"))
 	}
-	_, swapped, err := db.CmpAndSwap(ordersByAccountIDTable, []byte(o.AccountID), oldb, newb)
+	_, swapped, err := db.CmpAndSwap(ordersByAccountIDTable, []byte(accID), oldb, newb)
 	switch {
 	case err != nil:
-		return nil, ServerInternalErr(errors.Wrapf(err, "error storing order IDs for account %s", o.AccountID))
+		return ServerInternalErr(errors.Wrapf(err, "error storing order IDs for account %s", accID))
 	case !swapped:
-		return nil, ServerInternalErr(errors.Errorf("error storing order IDs "+
-			"for account %s; order IDs changed since last read", o.AccountID))
+		return ServerInternalErr(errors.Errorf("error storing order IDs "+
+			"for account %s; order IDs changed since last read", accID))
 	default:
-		return o, nil
+		return nil
 	}
 }
 
@@ -140,10 +151,10 @@ func (o *order) save(db nosql.DB, old *order) error {
 	_, swapped, err := db.CmpAndSwap(orderTable, []byte(o.ID), oldB, newB)
 	switch {
 	case err != nil:
-		return ServerInternalErr(errors.Wrap(err, "error writing acme order to disk"))
+		return ServerInternalErr(errors.Wrap(err, "error storing order"))
 	case !swapped:
-		return ServerInternalErr(errors.Errorf("error writing acme order to disk; "+
-			"order %s has changed since last read", o.ID))
+		return ServerInternalErr(errors.New("error storing order; " +
+			"value has changed since last read"))
 	default:
 		return nil
 	}
@@ -164,7 +175,7 @@ func (o *order) updateStatus(db nosql.DB) (*order, error) {
 		// check expiry
 		if now.After(o.Expires) {
 			newOrder.Status = statusInvalid
-			// TODO add something to error/problem indicating expiration.
+			newOrder.Error = MalformedErr(errors.New("order has expired"))
 			break
 		}
 		return o, nil
@@ -172,11 +183,15 @@ func (o *order) updateStatus(db nosql.DB) (*order, error) {
 		// check expiry
 		if now.After(o.Expires) {
 			newOrder.Status = statusInvalid
-			// TODO add something to error/problem indicating expiration.
+			newOrder.Error = MalformedErr(errors.New("order has expired"))
 			break
 		}
 
-		var allValid = true
+		var count = map[string]int{
+			statusValid:   0,
+			statusInvalid: 0,
+			statusPending: 0,
+		}
 		for _, azID := range o.Authorizations {
 			authz, err := getAuthz(db, azID)
 			if err != nil {
@@ -185,18 +200,21 @@ func (o *order) updateStatus(db nosql.DB) (*order, error) {
 			if authz, err = authz.updateStatus(db); err != nil {
 				return nil, err
 			}
-			if authz.getStatus() != statusValid {
-				allValid = false
-				break
-			}
+			st := authz.getStatus()
+			count[st]++
 		}
-
-		if allValid {
-			newOrder.Status = statusReady
+		switch {
+		case count[statusInvalid] > 0:
+			newOrder.Status = statusInvalid
+		case count[statusPending] > 0:
 			break
+		case count[statusValid] == len(o.Authorizations):
+			newOrder.Status = statusReady
+		default:
+			return nil, ServerInternalErr(errors.New("unexpected authz status"))
 		}
-		// Still pending, so do nothing.
-		return o, nil
+	default:
+		return nil, ServerInternalErr(errors.Errorf("unrecognized order status: %s", o.Status))
 	}
 
 	if err := newOrder.save(db, o); err != nil {
@@ -210,20 +228,19 @@ func (o *order) updateStatus(db nosql.DB) (*order, error) {
 func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAuthority) (*order, error) {
 	var err error
 	if o, err = o.updateStatus(db); err != nil {
-		return o, err
+		return nil, err
 	}
 	switch o.Status {
 	case statusInvalid:
-		return o, OrderNotReadyErr(errors.Errorf("order %s has been abandoned", o.ID))
+		return nil, OrderNotReadyErr(errors.Errorf("order %s has been abandoned", o.ID))
 	case statusValid:
-		break
-		//return o, errors.Errorf("order %s is already valid", o.ID)
+		return o, nil
 	case statusPending:
-		return o, OrderNotReadyErr(errors.Errorf("order %s is not ready", o.ID))
+		return nil, OrderNotReadyErr(errors.Errorf("order %s is not ready", o.ID))
 	case statusReady:
 		break
 	default:
-		return o, ServerInternalErr(errors.Errorf("unexpected status %s for order %s", o.Status, o.ID))
+		return nil, ServerInternalErr(errors.Errorf("unexpected status %s for order %s", o.Status, o.ID))
 	}
 
 	// Validate identifier names against CSR alternative names //
@@ -241,8 +258,7 @@ func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAut
 	}
 
 	if !reflect.DeepEqual(csrNames, orderNames) {
-		// TODO Note reason on the Order error object.
-		return nil, BadCSRErr(errors.Errorf("CSR names do not match order identifiers exactly"))
+		return nil, BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly"))
 	}
 
 	// Create and store a new certificate.
@@ -251,7 +267,7 @@ func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAut
 		NotAfter:  provisioner.NewTimeDuration(o.NotAfter),
 	})
 	if err != nil {
-		return nil, ServerInternalErr(errors.Wrap(err, "error generating certificat from finalize resource"))
+		return nil, ServerInternalErr(errors.Wrapf(err, "error generating certificate for order %s", o.ID))
 	}
 
 	cert, err := newCert(db, CertOptions{

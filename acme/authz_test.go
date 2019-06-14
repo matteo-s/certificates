@@ -630,7 +630,7 @@ func TestAuthzUpdateStatus(t *testing.T) {
 			return test{
 				az:  az,
 				res: az,
-				err: ServerInternalErr(errors.New("unrecognized status for authz: ready")),
+				err: ServerInternalErr(errors.New("unrecognized authz status: ready")),
 			}
 		},
 		"fail/save-error": func(t *testing.T) test {
@@ -738,7 +738,7 @@ func TestAuthzUpdateStatus(t *testing.T) {
 				},
 			}
 		},
-		"ok/stil-pending": func(t *testing.T) test {
+		"ok/still-pending": func(t *testing.T) test {
 			var ch1Bytes, ch2Bytes = &([]byte{}), &([]byte{})
 
 			count := 0
