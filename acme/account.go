@@ -71,15 +71,6 @@ func newAccount(db nosql.DB, ops AccountOptions) (*account, error) {
 	return a, nil
 }
 
-// getAccountByKeyID retrieves Id associated with the given Kid.
-func getAccountByKeyID(db nosql.DB, kid string) (*account, error) {
-	id, err := db.Get(accountByKeyIDTable, []byte(kid))
-	if err != nil {
-		return nil, ServerInternalErr(errors.WithStack(err))
-	}
-	return getAccountByID(db, string(id))
-}
-
 // toACME converts the internal Account type into the public acmeAccount
 // type for presentation in the ACME protocol.
 func (a *account) toACME(db nosql.DB, dir *directory) (*Account, error) {
@@ -175,16 +166,29 @@ func (a *account) deactivate(db nosql.DB) (*account, error) {
 
 // getAccountByID retrieves the account with the given ID.
 func getAccountByID(db nosql.DB, id string) (*account, error) {
-	var a account
-
 	ab, err := db.Get(accountTable, []byte(id))
-	if err != nil {
-		return nil, errors.WithStack(err)
+	if nosql.IsErrNotFound(err) {
+		return nil, MalformedErr(errors.Wrapf(err, "account %s not found", id))
+	} else if err != nil {
+		return nil, ServerInternalErr(errors.Wrap(err, "error loading account"))
 	}
+
+	var a account
 	if err = json.Unmarshal(ab, &a); err != nil {
-		return nil, errors.Wrap(err, "error unmarshaling acme account")
+		return nil, ServerInternalErr(errors.Wrap(err, "error unmarshaling account"))
 	}
 	return &a, nil
+}
+
+// getAccountByKeyID retrieves Id associated with the given Kid.
+func getAccountByKeyID(db nosql.DB, kid string) (*account, error) {
+	id, err := db.Get(accountByKeyIDTable, []byte(kid))
+	if nosql.IsErrNotFound(err) {
+		return nil, MalformedErr(errors.Wrapf(err, "account with key id %s not found", kid))
+	} else if err != nil {
+		return nil, ServerInternalErr(errors.Wrap(err, "error loading key-account index"))
+	}
+	return getAccountByID(db, string(id))
 }
 
 // getOrderIDsByAccount retrieves a list of Order IDs that were created by the
