@@ -317,7 +317,7 @@ func getAuthz(db nosql.DB, id string) (authz, error) {
 	if nosql.IsErrNotFound(err) {
 		return nil, MalformedErr(errors.Wrapf(err, "authz %s not found", id))
 	} else if err != nil {
-		return nil, ServerInternalErr(errors.Wrap(err, "error loading authz"))
+		return nil, ServerInternalErr(errors.Wrapf(err, "error loading authz %s", id))
 	}
 	az, err := unmarshalAuthz(b)
 	if err != nil {

@@ -296,7 +296,7 @@ func getOrder(db nosql.DB, id string) (*order, error) {
 	if nosql.IsErrNotFound(err) {
 		return nil, MalformedErr(errors.Wrapf(err, "order %s not found", id))
 	} else if err != nil {
-		return nil, ServerInternalErr(errors.Wrap(err, "error loading order"))
+		return nil, ServerInternalErr(errors.Wrapf(err, "error loading order %s", id))
 	}
 	var o order
 	if err := json.Unmarshal(b, &o); err != nil {

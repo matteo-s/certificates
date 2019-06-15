@@ -147,14 +147,14 @@ func (a *Authority) GetOrdersByAccount(id string) ([]string, error) {
 
 	var ret = []string{}
 	for _, oid := range oids {
-		order, err := getOrder(a.db, oid)
+		o, err := getOrder(a.db, oid)
 		if err != nil {
 			return nil, ServerInternalErr(err)
 		}
-		if order.Status == statusInvalid {
+		if o.Status == statusInvalid {
 			continue
 		}
-		ret = append(ret, a.dir.getLink(OrdersByAccountLink, true, oid))
+		ret = append(ret, a.dir.getLink(OrderLink, true, o.ID))
 	}
 	return ret, nil
 }
@@ -163,25 +163,25 @@ func (a *Authority) GetOrdersByAccount(id string) ([]string, error) {
 func (a *Authority) NewOrder(ops OrderOptions) (*Order, error) {
 	order, err := newOrder(a.db, ops)
 	if err != nil {
-		return nil, err
+		return nil, Wrap(err, "error creating order")
 	}
 	return order.toACME(a.db, a.dir)
 }
 
 // FinalizeOrder attempts to finalize an order and generate a new certificate.
 func (a *Authority) FinalizeOrder(accID, orderID string, csr *x509.CertificateRequest) (*Order, error) {
-	order, err := getOrder(a.db, orderID)
+	o, err := getOrder(a.db, orderID)
 	if err != nil {
 		return nil, err
 	}
-	if accID != order.AccountID {
+	if accID != o.AccountID {
 		return nil, UnauthorizedErr(errors.New("account does not own order"))
 	}
-	order, err = order.finalize(a.db, csr, a.signAuth)
+	o, err = o.finalize(a.db, csr, a.signAuth)
 	if err != nil {
-		return nil, err
+		return nil, Wrap(err, "error finalizing order")
 	}
-	return order.toACME(a.db, a.dir)
+	return o.toACME(a.db, a.dir)
 }
 
 // GetAuthz retrieves and attempts to update the status on an ACME authz
@@ -196,7 +196,7 @@ func (a *Authority) GetAuthz(accID, authzID string) (*Authz, error) {
 	}
 	authz, err = authz.updateStatus(a.db)
 	if err != nil {
-		return nil, err
+		return nil, Wrap(err, "error updating authz status")
 	}
 	return authz.toACME(a.db, a.dir)
 }

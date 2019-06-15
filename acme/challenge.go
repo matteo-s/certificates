@@ -396,7 +396,7 @@ func getChallenge(db nosql.DB, id string) (challenge, error) {
 	if nosql.IsErrNotFound(err) {
 		return nil, MalformedErr(errors.Wrapf(err, "challenge %s not found", id))
 	} else if err != nil {
-		return nil, ServerInternalErr(errors.Wrap(err, "error loading challenge from db"))
+		return nil, ServerInternalErr(errors.Wrapf(err, "error loading challenge %s", id))
 	}
 	ch, err := unmarshalChallenge(b)
 	if err != nil {

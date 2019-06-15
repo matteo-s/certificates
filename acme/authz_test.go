@@ -57,7 +57,7 @@ func TestGetAuthz(t *testing.T) {
 						return nil, errors.New("force")
 					},
 				},
-				err: ServerInternalErr(errors.New("error loading authz: force")),
+				err: ServerInternalErr(errors.Errorf("error loading authz %s: force", az.getID())),
 			}
 		},
 		"fail/unmarshal-error": func(t *testing.T) test {
@@ -364,7 +364,7 @@ func TestAuthzToACME(t *testing.T) {
 						return nil, errors.New("force")
 					},
 				},
-				err: ServerInternalErr(errors.New("error loading challenge from db: force")),
+				err: ServerInternalErr(errors.New("error loading challenge")),
 			}
 		},
 		"fail/getChallenge2-error": func(t *testing.T) test {
@@ -379,7 +379,7 @@ func TestAuthzToACME(t *testing.T) {
 						return *ch1Bytes, nil
 					},
 				},
-				err: ServerInternalErr(errors.New("error loading challenge from db: force")),
+				err: ServerInternalErr(errors.New("error loading challenge")),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -682,7 +682,7 @@ func TestAuthzUpdateStatus(t *testing.T) {
 						return nil, errors.New("force")
 					},
 				},
-				err: ServerInternalErr(errors.New("error loading challenge from db: force")),
+				err: ServerInternalErr(errors.New("error loading challenge")),
 			}
 		},
 		"ok/valid": func(t *testing.T) test {

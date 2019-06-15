@@ -79,7 +79,7 @@ func TestGetOrder(t *testing.T) {
 						return nil, errors.New("force")
 					},
 				},
-				err: ServerInternalErr(errors.New("error loading order: force")),
+				err: ServerInternalErr(errors.Errorf("error loading order %s: force", o.ID)),
 			}
 		},
 		"fail/unmarshal-error": func(t *testing.T) test {
@@ -639,7 +639,7 @@ func TestOrderUpdateStatus(t *testing.T) {
 						return nil, errors.New("force")
 					},
 				},
-				err: ServerInternalErr(errors.New("error loading authz: force")),
+				err: ServerInternalErr(errors.New("error loading authz")),
 			}
 		},
 		"ok/still-pending": func(t *testing.T) test {

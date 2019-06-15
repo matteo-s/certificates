@@ -64,11 +64,7 @@ func newAccount(db nosql.DB, ops AccountOptions) (*account, error) {
 		Status:  "valid",
 		Created: time.Now().UTC(),
 	}
-
-	if err := a.save(db, nil); err != nil {
-		return nil, err
-	}
-	return a, nil
+	return a, a.saveNew(db)
 }
 
 // toACME converts the internal Account type into the public acmeAccount
