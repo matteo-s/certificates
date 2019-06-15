@@ -1,7 +1,6 @@
 package acme
 
 import (
-	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"time"
@@ -13,31 +12,38 @@ import (
 
 var nonceLen = 32
 
-// Nonce contains nonce metadata used in the ACME protocol.
-type Nonce struct {
+// nonce contains nonce metadata used in the ACME protocol.
+type nonce struct {
+	ID      string
 	Created time.Time
 }
 
 // newNonce creates, stores, and returns an ACME replay-nonce.
-func newNonce(db nosql.DB) (string, error) {
-	b := make([]byte, nonceLen)
-	_, err := rand.Read(b)
+func newNonce(db nosql.DB) (*nonce, error) {
+	_id, err := randID()
 	if err != nil {
-		return "", ServerInternalErr(errors.Wrap(err, "error reading random bytes from crypto/rand"))
+		return nil, err
 	}
 
-	val := base64.RawURLEncoding.EncodeToString(b)
-	n := &Nonce{
-		Created: time.Now().UTC(),
+	id := base64.RawURLEncoding.EncodeToString([]byte(_id))
+	n := &nonce{
+		ID:      id,
+		Created: time.Now().UTC().Round(time.Second),
 	}
-	nb, err := json.Marshal(n)
+	b, err := json.Marshal(n)
 	if err != nil {
-		return "", ServerInternalErr(errors.Wrap(err, "error marshaling nonce"))
+		return nil, ServerInternalErr(errors.Wrap(err, "error marshaling nonce"))
 	}
-	if err := db.Set(nonceTable, []byte(val), nb); err != nil {
-		return "", ServerInternalErr(errors.Wrap(err, "error saving nonce"))
+	_, swapped, err := db.CmpAndSwap(nonceTable, []byte(id), nil, b)
+	switch {
+	case err != nil:
+		return nil, ServerInternalErr(errors.Wrap(err, "error storing nonce"))
+	case !swapped:
+		return nil, ServerInternalErr(errors.New("error storing nonce; " +
+			"value has changed since last read"))
+	default:
+		return n, nil
 	}
-	return val, nil
 }
 
 // useNonce verifies that the nonce is valid (by checking if it exists),
@@ -62,7 +68,7 @@ func useNonce(db nosql.DB, nonce string) error {
 	case nosql.IsErrNotFound(err):
 		return BadNonceErr(nil)
 	case err != nil:
-		return ServerInternalErr(errors.Wrap(err, "use-nonce: DB error"))
+		return ServerInternalErr(errors.Wrapf(err, "error deleting nonce %s", nonce))
 	default:
 		return nil
 	}

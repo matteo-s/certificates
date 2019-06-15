@@ -63,7 +63,11 @@ func (a *Authority) GetDirectory() *Directory {
 
 // NewNonce generates, stores, and returns a new ACME nonce.
 func (a *Authority) NewNonce() (string, error) {
-	return newNonce(a.db)
+	n, err := newNonce(a.db)
+	if err != nil {
+		return "", err
+	}
+	return n.ID, nil
 }
 
 // UseNonce consumes the given nonce if it is valid, returns error otherwise.
