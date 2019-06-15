@@ -86,60 +86,53 @@ func (a *account) toACME(db nosql.DB, dir *directory) (*Account, error) {
 // save writes the Account to the DB.
 // If the account is new then the necessary indices will be created.
 // Else, the account in the DB will be updated.
-func (a *account) save(db nosql.DB, swp *account) error {
-	if swp != nil {
-		return saveUpdate(db, a, swp)
-	}
-
+func (a *account) saveNew(db nosql.DB) error {
 	jwkID := []byte(a.Key.KeyID)
 
 	// Set the jwkID -> acme account ID index
 	_, swapped, err := db.CmpAndSwap(accountByKeyIDTable, jwkID, nil, []byte(a.ID))
-	if err != nil {
-		return errors.Wrap(err, "error setting jwkID to acme account index")
-	} else if !swapped {
-		return errors.Errorf("jwkID to acme account index already has entry for jwkID %s", jwkID)
-	}
-
-	accB, err := json.Marshal(*a)
-	if err != nil {
-		return errors.Wrap(err, "error marshaling acme account object")
-	}
-
-	// Set the Account
-	_, swapped, err = db.CmpAndSwap(accountTable, []byte(a.ID), nil, accB)
-	if err != nil || !swapped {
-		// Attempt to clean up previously added index
-		db.Del(accountByKeyIDTable, jwkID)
-		if err != nil {
-			return errors.Wrap(err, "error setting new acme account")
+	switch {
+	case err != nil:
+		return ServerInternalErr(errors.Wrap(err, "error setting key-id to account-id index"))
+	case !swapped:
+		return ServerInternalErr(errors.Errorf("key-id to account-id index already exists"))
+	default:
+		if err = a.save(db, nil); err != nil {
+			db.Del(accountByKeyIDTable, jwkID)
+			return err
 		}
-		return errors.Errorf("acme account with ID %s already exists", a.ID)
+		return nil
 	}
-
-	return nil
 }
 
-func saveUpdate(db nosql.DB, acc, swp *account) error {
-	swpB, err := json.Marshal(*swp)
-	if err != nil {
-		return errors.Wrap(err, "error marshaling acme account object")
+func (a *account) save(db nosql.DB, old *account) error {
+	var (
+		err  error
+		oldB []byte
+	)
+	if old == nil {
+		oldB = nil
+	} else {
+		if oldB, err = json.Marshal(old); err != nil {
+			return ServerInternalErr(errors.Wrap(err, "error marshaling old acme order"))
+		}
 	}
 
-	accB, err := json.Marshal(*acc)
+	b, err := json.Marshal(*a)
 	if err != nil {
-		return errors.Wrap(err, "error marshaling acme account object")
+		return errors.Wrap(err, "error marshaling new account object")
 	}
 	// Set the Account
-	_, swapped, err := db.CmpAndSwap(accountTable, []byte(acc.ID), swpB, accB)
-	if err != nil {
-		return errors.Wrapf(err,
-			"error updating account with ID %s", acc.ID)
-	} else if !swapped {
-		return errors.Wrapf(err,
-			"error updating account; account with ID %s has changed since last read", acc.ID)
+	_, swapped, err := db.CmpAndSwap(accountTable, []byte(a.ID), oldB, b)
+	switch {
+	case err != nil:
+		return ServerInternalErr(errors.Wrap(err, "error storing account"))
+	case !swapped:
+		return ServerInternalErr(errors.New("error storing account; " +
+			"value has changed since last read"))
+	default:
+		return nil
 	}
-	return nil
 }
 
 // update updates the acme account object stored in the database if,
@@ -157,7 +150,7 @@ func (a *account) update(db nosql.DB, contact []string) (*account, error) {
 func (a *account) deactivate(db nosql.DB) (*account, error) {
 	b := *a
 	b.Status = statusDeactivated
-	b.Deactivated = time.Now().UTC()
+	b.Deactivated = time.Now().UTC().Round(time.Second)
 	if err := (&b).save(db, a); err != nil {
 		return nil, err
 	}

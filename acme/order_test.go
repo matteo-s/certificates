@@ -18,7 +18,7 @@ import (
 
 var certDuration = 6 * time.Hour
 
-func defaultOps() OrderOptions {
+func defaultOrderOps() OrderOptions {
 	return OrderOptions{
 		AccountID: "accID",
 		Identifiers: []Identifier{
@@ -43,7 +43,7 @@ func newO() (*order, error) {
 			return b, nil
 		},
 	}
-	return newOrder(mockdb, defaultOps())
+	return newOrder(mockdb, defaultOrderOps())
 }
 
 func TestGetOrder(t *testing.T) {
@@ -310,7 +310,7 @@ func TestNewOrder(t *testing.T) {
 	}
 	tests := map[string]func(t *testing.T) test{
 		"fail/unexpected-identifier-type": func(t *testing.T) test {
-			ops := defaultOps()
+			ops := defaultOrderOps()
 			ops.Identifiers[0].Type = "foo"
 			return test{
 				ops: ops,
@@ -320,7 +320,7 @@ func TestNewOrder(t *testing.T) {
 		"fail/save-order-error": func(t *testing.T) test {
 			count := 0
 			return test{
-				ops: defaultOps(),
+				ops: defaultOrderOps(),
 				db: &db.MockNoSQLDB{
 					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
 						if count >= 6 {
@@ -335,7 +335,7 @@ func TestNewOrder(t *testing.T) {
 		},
 		"fail/get-orderIDs-error": func(t *testing.T) test {
 			count := 0
-			ops := defaultOps()
+			ops := defaultOrderOps()
 			return test{
 				ops: ops,
 				db: &db.MockNoSQLDB{
@@ -362,7 +362,7 @@ func TestNewOrder(t *testing.T) {
 				_oid = ""
 				oid  = &_oid
 			)
-			ops := defaultOps()
+			ops := defaultOrderOps()
 			return test{
 				ops: ops,
 				db: &db.MockNoSQLDB{
@@ -399,7 +399,7 @@ func TestNewOrder(t *testing.T) {
 				_oid = ""
 				oid  = &_oid
 			)
-			ops := defaultOps()
+			ops := defaultOrderOps()
 			return test{
 				ops: ops,
 				db: &db.MockNoSQLDB{
@@ -963,7 +963,7 @@ func TestOrderFinalize(t *testing.T) {
 			return test{
 				o:   o,
 				csr: csr,
-				err: ServerInternalErr(errors.Errorf("error storing new acme certificate type: force")),
+				err: ServerInternalErr(errors.Errorf("error storing certificate: force")),
 				sa: &mockSignAuth{
 					ret1: crt, ret2: inter,
 				},

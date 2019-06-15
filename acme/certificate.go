@@ -55,16 +55,16 @@ func newCert(db nosql.DB, ops CertOptions) (*certificate, error) {
 	}
 	certB, err := json.Marshal(cert)
 	if err != nil {
-		return nil, ServerInternalErr(errors.Wrap(err, "error marshaling acme certificate type"))
+		return nil, ServerInternalErr(errors.Wrap(err, "error marshaling certificate"))
 	}
 
 	_, swapped, err := db.CmpAndSwap(certTable, []byte(id), nil, certB)
 	switch {
 	case err != nil:
-		return nil, ServerInternalErr(errors.Wrap(err, "error storing new acme certificate type"))
+		return nil, ServerInternalErr(errors.Wrap(err, "error storing certificate"))
 	case !swapped:
-		return nil, ServerInternalErr(errors.Wrap(err, "error storing new acme "+
-			" certificate type; certificate with identical ID already exists"))
+		return nil, ServerInternalErr(errors.New("error storing certificate; " +
+			"value has changed since last read"))
 	default:
 		return cert, nil
 	}
@@ -74,7 +74,7 @@ func (c *certificate) toACME(db nosql.DB, dir *directory) ([]byte, error) {
 	return append(c.Leaf, c.Intermediates...), nil
 }
 
-func getCertificate(db nosql.DB, id string) (*certificate, error) {
+func getCert(db nosql.DB, id string) (*certificate, error) {
 	b, err := db.Get(certTable, []byte(id))
 	if nosql.IsErrNotFound(err) {
 		return nil, MalformedErr(errors.Wrapf(err, "certificate %s not found", id))

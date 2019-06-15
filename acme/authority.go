@@ -63,12 +63,12 @@ func (a *Authority) GetDirectory() *Directory {
 
 // NewNonce generates, stores, and returns a new ACME nonce.
 func (a *Authority) NewNonce() (string, error) {
-	return NewNonce(a.db)
+	return newNonce(a.db)
 }
 
 // UseNonce consumes the given nonce if it is valid, returns error otherwise.
 func (a *Authority) UseNonce(nonce string) error {
-	return UseNonce(a.db, nonce)
+	return useNonce(a.db, nonce)
 }
 
 // NewAccount creates, stores, and returns a new ACME account.
@@ -230,7 +230,7 @@ func (a *Authority) ValidateChallenge(accID, chID string, jwk *jose.JSONWebKey) 
 
 // GetCertificate retrieves the Certificate by ID.
 func (a *Authority) GetCertificate(accID, certID string) ([]byte, error) {
-	cert, err := getCertificate(a.db, certID)
+	cert, err := getCert(a.db, certID)
 	if err != nil {
 		return nil, err
 	}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
@@ -338,6 +339,382 @@ func TestAccountToACME(t *testing.T) {
 					assert.Equals(t, acmeAccount.Contact, tc.acc.Contact)
 					assert.Equals(t, acmeAccount.Key.KeyID, tc.acc.Key.KeyID)
 					assert.Equals(t, acmeAccount.Orders, fmt.Sprintf("https://ca.smallstep.com/acme/account/%s/orders", tc.acc.ID))
+				}
+			}
+		})
+	}
+}
+
+func TestAccountSave(t *testing.T) {
+	type test struct {
+		acc, old *account
+		db       nosql.DB
+		err      *Error
+	}
+	tests := map[string]func(t *testing.T) test{
+		"fail/old-nil/swap-error": func(t *testing.T) test {
+			acc, err := newAcc()
+			assert.FatalError(t, err)
+			return test{
+				acc: acc,
+				old: nil,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						return nil, false, errors.New("force")
+					},
+				},
+				err: ServerInternalErr(errors.New("error storing account: force")),
+			}
+		},
+		"fail/old-nil/swap-false": func(t *testing.T) test {
+			acc, err := newAcc()
+			assert.FatalError(t, err)
+			return test{
+				acc: acc,
+				old: nil,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						return []byte("foo"), false, nil
+					},
+				},
+				err: ServerInternalErr(errors.New("error storing account; value has changed since last read")),
+			}
+		},
+		"ok/old-nil": func(t *testing.T) test {
+			acc, err := newAcc()
+			assert.FatalError(t, err)
+			b, err := json.Marshal(acc)
+			assert.FatalError(t, err)
+			return test{
+				acc: acc,
+				old: nil,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						assert.Equals(t, old, nil)
+						assert.Equals(t, b, newval)
+						assert.Equals(t, bucket, accountTable)
+						assert.Equals(t, []byte(acc.ID), key)
+						return nil, true, nil
+					},
+				},
+			}
+		},
+		"ok/old-not-nil": func(t *testing.T) test {
+			oldAcc, err := newAcc()
+			assert.FatalError(t, err)
+			acc, err := newAcc()
+			assert.FatalError(t, err)
+
+			oldb, err := json.Marshal(oldAcc)
+			assert.FatalError(t, err)
+			b, err := json.Marshal(acc)
+			assert.FatalError(t, err)
+			return test{
+				acc: acc,
+				old: oldAcc,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						assert.Equals(t, old, oldb)
+						assert.Equals(t, newval, b)
+						assert.Equals(t, bucket, accountTable)
+						assert.Equals(t, []byte(acc.ID), key)
+						return []byte("foo"), true, nil
+					},
+				},
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run(t)
+			if err := tc.acc.save(tc.db, tc.old); err != nil {
+				if assert.NotNil(t, tc.err) {
+					ae, ok := err.(*Error)
+					assert.True(t, ok)
+					assert.HasPrefix(t, ae.Error(), tc.err.Error())
+					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
+					assert.Equals(t, ae.Type, tc.err.Type)
+				}
+			} else {
+				assert.Nil(t, tc.err)
+			}
+		})
+	}
+}
+
+func TestAccountSaveNew(t *testing.T) {
+	type test struct {
+		acc *account
+		db  nosql.DB
+		err *Error
+	}
+	tests := map[string]func(t *testing.T) test{
+		"fail/swap-error": func(t *testing.T) test {
+			acc, err := newAcc()
+			assert.FatalError(t, err)
+			return test{
+				acc: acc,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						assert.Equals(t, bucket, accountByKeyIDTable)
+						assert.Equals(t, key, []byte(acc.Key.KeyID))
+						assert.Equals(t, old, nil)
+						assert.Equals(t, newval, []byte(acc.ID))
+						return nil, false, errors.New("force")
+					},
+				},
+				err: ServerInternalErr(errors.New("error setting key-id to account-id index: force")),
+			}
+		},
+		"fail/swap-false": func(t *testing.T) test {
+			acc, err := newAcc()
+			assert.FatalError(t, err)
+			return test{
+				acc: acc,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						assert.Equals(t, bucket, accountByKeyIDTable)
+						assert.Equals(t, key, []byte(acc.Key.KeyID))
+						assert.Equals(t, old, nil)
+						assert.Equals(t, newval, []byte(acc.ID))
+						return nil, false, nil
+					},
+				},
+				err: ServerInternalErr(errors.New("key-id to account-id index already exists")),
+			}
+		},
+		"fail/save-error": func(t *testing.T) test {
+			acc, err := newAcc()
+			assert.FatalError(t, err)
+			b, err := json.Marshal(acc)
+			assert.FatalError(t, err)
+			count := 0
+			return test{
+				acc: acc,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						if count == 0 {
+							assert.Equals(t, bucket, accountByKeyIDTable)
+							assert.Equals(t, key, []byte(acc.Key.KeyID))
+							assert.Equals(t, old, nil)
+							assert.Equals(t, newval, []byte(acc.ID))
+							count++
+							return nil, true, nil
+						}
+						assert.Equals(t, bucket, accountTable)
+						assert.Equals(t, key, []byte(acc.ID))
+						assert.Equals(t, old, nil)
+						assert.Equals(t, newval, b)
+						return nil, false, errors.New("force")
+					},
+					MDel: func(bucket, key []byte) error {
+						assert.Equals(t, bucket, accountByKeyIDTable)
+						assert.Equals(t, key, []byte(acc.Key.KeyID))
+						return nil
+					},
+				},
+				err: ServerInternalErr(errors.New("error storing account: force")),
+			}
+		},
+		"ok": func(t *testing.T) test {
+			acc, err := newAcc()
+			assert.FatalError(t, err)
+			b, err := json.Marshal(acc)
+			assert.FatalError(t, err)
+			count := 0
+			return test{
+				acc: acc,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						if count == 0 {
+							assert.Equals(t, bucket, accountByKeyIDTable)
+							assert.Equals(t, key, []byte(acc.Key.KeyID))
+							assert.Equals(t, old, nil)
+							assert.Equals(t, newval, []byte(acc.ID))
+							count++
+							return nil, true, nil
+						}
+						assert.Equals(t, bucket, accountTable)
+						assert.Equals(t, key, []byte(acc.ID))
+						assert.Equals(t, old, nil)
+						assert.Equals(t, newval, b)
+						return nil, true, nil
+					},
+				},
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run(t)
+			if err := tc.acc.saveNew(tc.db); err != nil {
+				if assert.NotNil(t, tc.err) {
+					ae, ok := err.(*Error)
+					assert.True(t, ok)
+					assert.HasPrefix(t, ae.Error(), tc.err.Error())
+					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
+					assert.Equals(t, ae.Type, tc.err.Type)
+				}
+			} else {
+				assert.Nil(t, tc.err)
+			}
+		})
+	}
+}
+
+func TestAccountUpdate(t *testing.T) {
+	type test struct {
+		acc     *account
+		contact []string
+		db      nosql.DB
+		res     []byte
+		err     *Error
+	}
+	contact := []string{"foo", "bar"}
+	tests := map[string]func(t *testing.T) test{
+		"fail/save-error": func(t *testing.T) test {
+			acc, err := newAcc()
+			assert.FatalError(t, err)
+			oldb, err := json.Marshal(acc)
+			assert.FatalError(t, err)
+
+			_acc := *acc
+			clone := &_acc
+			clone.Contact = contact
+			b, err := json.Marshal(clone)
+			assert.FatalError(t, err)
+			return test{
+				acc:     acc,
+				contact: contact,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						assert.Equals(t, bucket, accountTable)
+						assert.Equals(t, key, []byte(acc.ID))
+						assert.Equals(t, old, oldb)
+						assert.Equals(t, newval, b)
+						return nil, false, errors.New("force")
+					},
+				},
+				err: ServerInternalErr(errors.New("error storing account: force")),
+			}
+		},
+		"ok": func(t *testing.T) test {
+			acc, err := newAcc()
+			assert.FatalError(t, err)
+			oldb, err := json.Marshal(acc)
+			assert.FatalError(t, err)
+
+			_acc := *acc
+			clone := &_acc
+			clone.Contact = contact
+			b, err := json.Marshal(clone)
+			assert.FatalError(t, err)
+			return test{
+				acc:     acc,
+				contact: contact,
+				res:     b,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						assert.Equals(t, bucket, accountTable)
+						assert.Equals(t, key, []byte(acc.ID))
+						assert.Equals(t, old, oldb)
+						assert.Equals(t, newval, b)
+						return nil, true, nil
+					},
+				},
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run(t)
+			acc, err := tc.acc.update(tc.db, tc.contact)
+			if err != nil {
+				if assert.NotNil(t, tc.err) {
+					ae, ok := err.(*Error)
+					assert.True(t, ok)
+					assert.HasPrefix(t, ae.Error(), tc.err.Error())
+					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
+					assert.Equals(t, ae.Type, tc.err.Type)
+				}
+			} else {
+				if assert.Nil(t, tc.err) {
+					b, err := json.Marshal(acc)
+					assert.FatalError(t, err)
+					assert.Equals(t, b, tc.res)
+				}
+			}
+		})
+	}
+}
+
+func TestAccountDeactivate(t *testing.T) {
+	type test struct {
+		acc *account
+		db  nosql.DB
+		err *Error
+	}
+	tests := map[string]func(t *testing.T) test{
+		"fail/save-error": func(t *testing.T) test {
+			acc, err := newAcc()
+			assert.FatalError(t, err)
+			oldb, err := json.Marshal(acc)
+			assert.FatalError(t, err)
+
+			return test{
+				acc: acc,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						assert.Equals(t, bucket, accountTable)
+						assert.Equals(t, key, []byte(acc.ID))
+						assert.Equals(t, old, oldb)
+						return nil, false, errors.New("force")
+					},
+				},
+				err: ServerInternalErr(errors.New("error storing account: force")),
+			}
+		},
+		"ok": func(t *testing.T) test {
+			acc, err := newAcc()
+			assert.FatalError(t, err)
+			oldb, err := json.Marshal(acc)
+			assert.FatalError(t, err)
+
+			return test{
+				acc: acc,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						assert.Equals(t, bucket, accountTable)
+						assert.Equals(t, key, []byte(acc.ID))
+						assert.Equals(t, old, oldb)
+						return nil, true, nil
+					},
+				},
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run(t)
+			acc, err := tc.acc.deactivate(tc.db)
+			if err != nil {
+				if assert.NotNil(t, tc.err) {
+					ae, ok := err.(*Error)
+					assert.True(t, ok)
+					assert.HasPrefix(t, ae.Error(), tc.err.Error())
+					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
+					assert.Equals(t, ae.Type, tc.err.Type)
+				}
+			} else {
+				if assert.Nil(t, tc.err) {
+					assert.Equals(t, acc.ID, tc.acc.ID)
+					assert.Equals(t, acc.Contact, tc.acc.Contact)
+					assert.Equals(t, acc.Status, statusDeactivated)
+					assert.Equals(t, acc.Key.KeyID, tc.acc.Key.KeyID)
+					assert.Equals(t, acc.Created, tc.acc.Created)
+
+					assert.True(t, acc.Deactivated.Before(time.Now().Add(time.Minute)))
+					assert.True(t, acc.Deactivated.After(time.Now().Add(-time.Minute)))
 				}
 			}
 		})

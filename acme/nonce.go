@@ -18,8 +18,8 @@ type Nonce struct {
 	Created time.Time
 }
 
-// NewNonce creates, stores, and returns an ACME replay-nonce.
-func NewNonce(db nosql.DB) (string, error) {
+// newNonce creates, stores, and returns an ACME replay-nonce.
+func newNonce(db nosql.DB) (string, error) {
 	b := make([]byte, nonceLen)
 	_, err := rand.Read(b)
 	if err != nil {
@@ -40,9 +40,9 @@ func NewNonce(db nosql.DB) (string, error) {
 	return val, nil
 }
 
-// UseNonce verifies that the nonce is valid (by checking if it exists),
+// useNonce verifies that the nonce is valid (by checking if it exists),
 // and if so, consumes the nonce resource by deleting it from the database.
-func UseNonce(db nosql.DB, nonce string) error {
+func useNonce(db nosql.DB, nonce string) error {
 	err := db.Update(&database.Tx{
 		Operations: []*database.TxEntry{
 			&database.TxEntry{
