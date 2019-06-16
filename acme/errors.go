@@ -406,7 +406,8 @@ func (e *Error) MarshalJSON() ([]byte, error) {
 	return json.Marshal(e.toACME())
 }
 
-type acmeError struct {
+// AError is the error type as seen in acme request/responses.
+type AError struct {
 	Type        string        `json:"type"`
 	Detail      string        `json:"detail"`
 	Identifier  interface{}   `json:"identifier,omitempty"`
@@ -414,8 +415,8 @@ type acmeError struct {
 }
 
 // toACME returns an acme representation of the problem type.
-func (e *Error) toACME() interface{} {
-	ae := acmeError{
+func (e *Error) toACME() *AError {
+	ae := &AError{
 		Type:   "urn:ietf:params:acme:error:" + e.Type.String(),
 		Detail: e.Error(),
 	}

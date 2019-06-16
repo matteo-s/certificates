@@ -114,8 +114,8 @@ func (h *Handler) GetAuthz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.JSON(w, authz)
 	w.Header().Set("Location", h.Auth.GetLink(acme.AuthzLink, true, authz.GetID()))
+	api.JSON(w, authz)
 	w.WriteHeader(http.StatusOK)
 	return
 }

@@ -12,23 +12,23 @@ import (
 
 // Interface is the acme authority interface.
 type Interface interface {
-	GetLink(Link, bool, ...string) string
-	GetDirectory() *Directory
-	NewNonce() (string, error)
-	UseNonce(string) error
-	NewAccount(AccountOptions) (*Account, error)
-	UpdateAccount(string, []string) (*Account, error)
 	DeactivateAccount(string) (*Account, error)
+	FinalizeOrder(string, string, *x509.CertificateRequest) (*Order, error)
 	GetAccount(string) (*Account, error)
 	GetAccountByKeyID(string) (*Account, error)
-	GetOrdersByAccount(string) ([]string, error)
-	NewOrder(OrderOptions) (*Order, error)
-	GetOrder(string, string) (*Order, error)
-	FinalizeOrder(string, string, *x509.CertificateRequest) (*Order, error)
 	GetAuthz(string, string) (*Authz, error)
 	GetChallenge(string, string) (*Challenge, error)
-	ValidateChallenge(string, string, *jose.JSONWebKey) (*Challenge, error)
 	GetCertificate(string, string) ([]byte, error)
+	GetDirectory() *Directory
+	GetLink(Link, bool, ...string) string
+	GetOrder(string, string) (*Order, error)
+	GetOrdersByAccount(string) ([]string, error)
+	NewAccount(AccountOptions) (*Account, error)
+	NewNonce() (string, error)
+	NewOrder(OrderOptions) (*Order, error)
+	UpdateAccount(string, []string) (*Account, error)
+	UseNonce(string) error
+	ValidateChallenge(string, string, *jose.JSONWebKey) (*Challenge, error)
 }
 
 // Authority is the layer that handles all ACME interactions.
