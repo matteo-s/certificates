@@ -62,7 +62,7 @@ func TestGetAccountByID(t *testing.T) {
 						return nil, errors.New("force")
 					},
 				},
-				err: ServerInternalErr(errors.New("error loading account: force")),
+				err: ServerInternalErr(errors.Errorf("error loading account %s: force", acc.ID)),
 			}
 		},
 		"fail/unmarshal-error": func(t *testing.T) test {
@@ -169,7 +169,7 @@ func TestGetAccountByKeyID(t *testing.T) {
 						return nil, errors.New("force")
 					},
 				},
-				err: ServerInternalErr(errors.New("error loading account: force")),
+				err: ServerInternalErr(errors.New("error loading account bar: force")),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -715,6 +715,84 @@ func TestAccountDeactivate(t *testing.T) {
 
 					assert.True(t, acc.Deactivated.Before(time.Now().Add(time.Minute)))
 					assert.True(t, acc.Deactivated.After(time.Now().Add(-time.Minute)))
+				}
+			}
+		})
+	}
+}
+
+func TestNewAccount(t *testing.T) {
+	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+	assert.FatalError(t, err)
+	ops := AccountOptions{
+		Key:     jwk,
+		Contact: []string{"foo", "bar"},
+	}
+	type test struct {
+		ops AccountOptions
+		db  nosql.DB
+		err *Error
+		id  *string
+	}
+	tests := map[string]func(t *testing.T) test{
+		"fail/store-error": func(t *testing.T) test {
+			return test{
+				ops: ops,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						return nil, false, errors.New("force")
+					},
+				},
+				err: ServerInternalErr(errors.New("error setting key-id to account-id index: force")),
+			}
+		},
+		"ok": func(t *testing.T) test {
+			var _id string
+			id := &_id
+			count := 0
+			return test{
+				ops: ops,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						switch count {
+						case 0:
+							assert.Equals(t, bucket, accountByKeyIDTable)
+							assert.Equals(t, key, []byte(ops.Key.KeyID))
+						case 1:
+							assert.Equals(t, bucket, accountTable)
+							*id = string(key)
+						}
+						count++
+						return nil, true, nil
+					},
+				},
+				id: id,
+			}
+		},
+	}
+	for name, run := range tests {
+		tc := run(t)
+		t.Run(name, func(t *testing.T) {
+			acc, err := newAccount(tc.db, tc.ops)
+			if err != nil {
+				if assert.NotNil(t, tc.err) {
+					ae, ok := err.(*Error)
+					assert.True(t, ok)
+					assert.HasPrefix(t, ae.Error(), tc.err.Error())
+					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
+					assert.Equals(t, ae.Type, tc.err.Type)
+				}
+			} else {
+				if assert.Nil(t, tc.err) {
+					assert.Equals(t, acc.ID, *tc.id)
+					assert.Equals(t, acc.Status, statusValid)
+					assert.Equals(t, acc.Contact, ops.Contact)
+					assert.Equals(t, acc.Key.KeyID, ops.Key.KeyID)
+
+					assert.True(t, acc.Deactivated.IsZero())
+
+					assert.True(t, acc.Created.Before(time.Now().UTC().Add(time.Minute)))
+					assert.True(t, acc.Created.After(time.Now().UTC().Add(-1*time.Minute)))
 				}
 			}
 		})

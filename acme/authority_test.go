@@ -273,7 +273,7 @@ func TestAuthorityGetAccount(t *testing.T) {
 			return test{
 				auth: auth,
 				id:   id,
-				err:  ServerInternalErr(errors.New("error loading account: force")),
+				err:  ServerInternalErr(errors.Errorf("error loading account %s: force", id)),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -1290,6 +1290,208 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 					assert.FatalError(t, err)
 
 					acmeExp, err := tc.ch.toACME(nil, tc.auth.dir)
+					assert.FatalError(t, err)
+					expb, err := json.Marshal(acmeExp)
+					assert.FatalError(t, err)
+
+					assert.Equals(t, expb, gotb)
+				}
+			}
+		})
+	}
+}
+
+func TestAuthorityUpdateAccount(t *testing.T) {
+	contact := []string{"baz", "zap"}
+	type test struct {
+		auth    *Authority
+		id      string
+		contact []string
+		acc     *account
+		err     *Error
+	}
+	tests := map[string]func(t *testing.T) test{
+		"fail/getAccount-error": func(t *testing.T) test {
+			id := "foo"
+			auth := NewAuthority(&db.MockNoSQLDB{
+				MGet: func(bucket, key []byte) ([]byte, error) {
+					assert.Equals(t, bucket, accountTable)
+					assert.Equals(t, key, []byte(id))
+					return nil, errors.New("force")
+				},
+			}, "ca.smallstep.com", "acme", nil)
+			return test{
+				auth:    auth,
+				id:      id,
+				contact: contact,
+				err:     ServerInternalErr(errors.Errorf("error loading account %s: force", id)),
+			}
+		},
+		"fail/update-error": func(t *testing.T) test {
+			acc, err := newAcc()
+			assert.FatalError(t, err)
+			b, err := json.Marshal(acc)
+			assert.FatalError(t, err)
+
+			auth := NewAuthority(&db.MockNoSQLDB{
+				MGet: func(bucket, key []byte) ([]byte, error) {
+					return b, nil
+				},
+				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+					return nil, false, errors.New("force")
+				},
+			}, "ca.smallstep.com", "acme", nil)
+			return test{
+				auth:    auth,
+				id:      acc.ID,
+				contact: contact,
+				err:     ServerInternalErr(errors.New("error storing account: force")),
+			}
+		},
+
+		"ok": func(t *testing.T) test {
+			acc, err := newAcc()
+			assert.FatalError(t, err)
+			b, err := json.Marshal(acc)
+			assert.FatalError(t, err)
+
+			_acc := *acc
+			clone := &_acc
+			clone.Contact = contact
+			auth := NewAuthority(&db.MockNoSQLDB{
+				MGet: func(bucket, key []byte) ([]byte, error) {
+					return b, nil
+				},
+				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+					assert.Equals(t, bucket, accountTable)
+					assert.Equals(t, key, []byte(acc.ID))
+					return nil, true, nil
+				},
+			}, "ca.smallstep.com", "acme", nil)
+			return test{
+				auth:    auth,
+				id:      acc.ID,
+				contact: contact,
+				acc:     clone,
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run(t)
+			if acmeAcc, err := tc.auth.UpdateAccount(tc.id, tc.contact); err != nil {
+				if assert.NotNil(t, tc.err) {
+					ae, ok := err.(*Error)
+					assert.True(t, ok)
+					assert.HasPrefix(t, ae.Error(), tc.err.Error())
+					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
+					assert.Equals(t, ae.Type, tc.err.Type)
+				}
+			} else {
+				if assert.Nil(t, tc.err) {
+					gotb, err := json.Marshal(acmeAcc)
+					assert.FatalError(t, err)
+
+					acmeExp, err := tc.acc.toACME(nil, tc.auth.dir)
+					assert.FatalError(t, err)
+					expb, err := json.Marshal(acmeExp)
+					assert.FatalError(t, err)
+
+					assert.Equals(t, expb, gotb)
+				}
+			}
+		})
+	}
+}
+
+func TestAuthorityDeactivateAccount(t *testing.T) {
+	type test struct {
+		auth *Authority
+		id   string
+		acc  *account
+		err  *Error
+	}
+	tests := map[string]func(t *testing.T) test{
+		"fail/getAccount-error": func(t *testing.T) test {
+			id := "foo"
+			auth := NewAuthority(&db.MockNoSQLDB{
+				MGet: func(bucket, key []byte) ([]byte, error) {
+					assert.Equals(t, bucket, accountTable)
+					assert.Equals(t, key, []byte(id))
+					return nil, errors.New("force")
+				},
+			}, "ca.smallstep.com", "acme", nil)
+			return test{
+				auth: auth,
+				id:   id,
+				err:  ServerInternalErr(errors.Errorf("error loading account %s: force", id)),
+			}
+		},
+		"fail/deactivate-error": func(t *testing.T) test {
+			acc, err := newAcc()
+			assert.FatalError(t, err)
+			b, err := json.Marshal(acc)
+			assert.FatalError(t, err)
+
+			auth := NewAuthority(&db.MockNoSQLDB{
+				MGet: func(bucket, key []byte) ([]byte, error) {
+					return b, nil
+				},
+				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+					return nil, false, errors.New("force")
+				},
+			}, "ca.smallstep.com", "acme", nil)
+			return test{
+				auth: auth,
+				id:   acc.ID,
+				err:  ServerInternalErr(errors.New("error storing account: force")),
+			}
+		},
+
+		"ok": func(t *testing.T) test {
+			acc, err := newAcc()
+			assert.FatalError(t, err)
+			b, err := json.Marshal(acc)
+			assert.FatalError(t, err)
+
+			_acc := *acc
+			clone := &_acc
+			clone.Status = statusDeactivated
+			clone.Deactivated = time.Now().UTC().Round(time.Second)
+			auth := NewAuthority(&db.MockNoSQLDB{
+				MGet: func(bucket, key []byte) ([]byte, error) {
+					return b, nil
+				},
+				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+					assert.Equals(t, bucket, accountTable)
+					assert.Equals(t, key, []byte(acc.ID))
+					return nil, true, nil
+				},
+			}, "ca.smallstep.com", "acme", nil)
+			return test{
+				auth: auth,
+				id:   acc.ID,
+				acc:  clone,
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run(t)
+			if acmeAcc, err := tc.auth.DeactivateAccount(tc.id); err != nil {
+				if assert.NotNil(t, tc.err) {
+					ae, ok := err.(*Error)
+					assert.True(t, ok)
+					assert.HasPrefix(t, ae.Error(), tc.err.Error())
+					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
+					assert.Equals(t, ae.Type, tc.err.Type)
+				}
+			} else {
+				if assert.Nil(t, tc.err) {
+					gotb, err := json.Marshal(acmeAcc)
+					assert.FatalError(t, err)
+
+					acmeExp, err := tc.acc.toACME(nil, tc.auth.dir)
 					assert.FatalError(t, err)
 					expb, err := json.Marshal(acmeExp)
 					assert.FatalError(t, err)

@@ -88,7 +88,7 @@ func (a *Authority) NewAccount(ao AccountOptions) (*Account, error) {
 func (a *Authority) UpdateAccount(id string, contact []string) (*Account, error) {
 	acc, err := getAccountByID(a.db, id)
 	if err != nil {
-		return nil, err
+		return nil, ServerInternalErr(err)
 	}
 	if acc, err = acc.update(a.db, contact); err != nil {
 		return nil, err

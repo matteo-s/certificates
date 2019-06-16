@@ -159,7 +159,7 @@ func getAccountByID(db nosql.DB, id string) (*account, error) {
 	if nosql.IsErrNotFound(err) {
 		return nil, MalformedErr(errors.Wrapf(err, "account %s not found", id))
 	} else if err != nil {
-		return nil, ServerInternalErr(errors.Wrap(err, "error loading account"))
+		return nil, ServerInternalErr(errors.Wrapf(err, "error loading account %s", id))
 	}
 
 	var a account
