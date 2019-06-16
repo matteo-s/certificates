@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"net/http/httptest"
@@ -15,6 +16,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
+	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/jose"
 )
 
@@ -291,7 +293,7 @@ func TestHandlerGetAuthz(t *testing.T) {
 				auth:       &mockAcmeAuthority{},
 				ctx:        context.Background(),
 				statusCode: 404,
-				problem:    acme.AccountDoesNotExistErr(errors.Errorf("account not found")),
+				problem:    acme.AccountDoesNotExistErr(nil),
 			}
 		},
 		"fail/nil-account": func(t *testing.T) test {
@@ -300,10 +302,10 @@ func TestHandlerGetAuthz(t *testing.T) {
 				auth:       &mockAcmeAuthority{},
 				ctx:        ctx,
 				statusCode: 404,
-				problem:    acme.AccountDoesNotExistErr(errors.Errorf("account not found")),
+				problem:    acme.AccountDoesNotExistErr(nil),
 			}
 		},
-		"fail/getAccount-error": func(t *testing.T) test {
+		"fail/getAuthz-error": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accID"}
 			ctx := context.WithValue(context.Background(), accContextKey, acc)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
@@ -369,6 +371,119 @@ func TestHandlerGetAuthz(t *testing.T) {
 				assert.FatalError(t, err)
 				assert.Equals(t, bytes.TrimSpace(body), expB)
 				assert.Equals(t, res.Header["Location"], []string{url})
+			}
+		})
+	}
+}
+
+func TestHandlerGetCertificate(t *testing.T) {
+	leaf, err := pemutil.ReadCertificate("../../authority/testdata/certs/foo.crt")
+	assert.FatalError(t, err)
+	inter, err := pemutil.ReadCertificate("../../authority/testdata/certs/intermediate_ca.crt")
+	assert.FatalError(t, err)
+	root, err := pemutil.ReadCertificate("../../authority/testdata/certs/root_ca.crt")
+	assert.FatalError(t, err)
+
+	certBytes := append(pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: leaf.Raw,
+	}), pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: inter.Raw,
+	})...)
+	certBytes = append(certBytes, pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: root.Raw,
+	})...)
+	certID := "certID"
+
+	// Request with chi context
+	chiCtx := chi.NewRouteContext()
+	chiCtx.URLParams.Add("certID", certID)
+	url := fmt.Sprintf("http://ca.smallstep.com/acme/certificate/%s", certID)
+
+	type test struct {
+		auth       acme.Interface
+		ctx        context.Context
+		statusCode int
+		problem    *acme.Error
+	}
+	var tests = map[string]func(t *testing.T) test{
+		"fail/no-account": func(t *testing.T) test {
+			return test{
+				auth:       &mockAcmeAuthority{},
+				ctx:        context.Background(),
+				statusCode: 404,
+				problem:    acme.AccountDoesNotExistErr(nil),
+			}
+		},
+		"fail/nil-account": func(t *testing.T) test {
+			ctx := context.WithValue(context.Background(), accContextKey, nil)
+			return test{
+				auth:       &mockAcmeAuthority{},
+				ctx:        ctx,
+				statusCode: 404,
+				problem:    acme.AccountDoesNotExistErr(nil),
+			}
+		},
+		"fail/getCertificate-error": func(t *testing.T) test {
+			acc := &acme.Account{ID: "accID"}
+			ctx := context.WithValue(context.Background(), accContextKey, acc)
+			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
+			return test{
+				auth: &mockAcmeAuthority{
+					err: acme.ServerInternalErr(errors.New("force")),
+				},
+				ctx:        ctx,
+				statusCode: 500,
+				problem:    acme.ServerInternalErr(errors.New("force")),
+			}
+		},
+		"ok": func(t *testing.T) test {
+			acc := &acme.Account{ID: "accID"}
+			ctx := context.WithValue(context.Background(), accContextKey, acc)
+			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
+			return test{
+				auth: &mockAcmeAuthority{
+					getCertificate: func(accID, id string) ([]byte, error) {
+						assert.Equals(t, accID, acc.ID)
+						assert.Equals(t, id, certID)
+						return certBytes, nil
+					},
+				},
+				ctx:        ctx,
+				statusCode: 200,
+			}
+		},
+	}
+	for name, run := range tests {
+		tc := run(t)
+		t.Run(name, func(t *testing.T) {
+			h := New(tc.auth).(*Handler)
+			req := httptest.NewRequest("GET", url, nil)
+			req = req.WithContext(tc.ctx)
+			w := httptest.NewRecorder()
+			h.GetCertificate(w, req)
+			res := w.Result()
+
+			assert.Equals(t, res.StatusCode, tc.statusCode)
+
+			body, err := ioutil.ReadAll(res.Body)
+			res.Body.Close()
+			assert.FatalError(t, err)
+
+			if res.StatusCode >= 400 && assert.NotNil(t, tc.problem) {
+				b, err := json.Marshal(tc.problem)
+				assert.FatalError(t, err)
+				//var problem *acme.Error
+				//assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &problem))
+				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
+				assert.Equals(t, bytes.TrimSpace(body), b)
+			} else {
+				//var gotAz acme.Authz
+				//assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &gotAz))
+				assert.Equals(t, bytes.TrimSpace(body), bytes.TrimSpace(certBytes))
+				assert.Equals(t, res.Header["Content-Type"], []string{"application/pem-certificate-chain; charset=utf-8"})
 			}
 		})
 	}

@@ -105,7 +105,7 @@ func (h *Handler) GetAuthz(w http.ResponseWriter, r *http.Request) {
 	acc, ok := accountFromContext(r)
 	if !ok || acc == nil {
 		// Account does not exist //
-		api.WriteError(w, acme.AccountDoesNotExistErr(errors.Errorf("account not found")))
+		api.WriteError(w, acme.AccountDoesNotExistErr(nil))
 		return
 	}
 	authz, err := h.Auth.GetAuthz(acc.GetID(), chi.URLParam(r, "authzID"))
