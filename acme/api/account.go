@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
@@ -15,10 +16,22 @@ type NewAccountRequest struct {
 	OnlyReturnExisting bool
 }
 
+func validateContacts(cs []string) error {
+	for _, c := range cs {
+		if len(c) == 0 {
+			return acme.MalformedErr(errors.New("contact cannot be empty string"))
+		}
+	}
+	return nil
+}
+
 // Validate validates a new-account request body.
 func (n *NewAccountRequest) Validate() error {
-	if n.Contact != nil {
-		// TODO: Check contacts.
+	if n.OnlyReturnExisting && len(n.Contact) > 0 {
+		return acme.MalformedErr(errors.New("incompatible input; onlyReturnExisting must be alone"))
+	}
+	if err := validateContacts(n.Contact); err != nil {
+		return err
 	}
 	return nil
 }
@@ -37,10 +50,15 @@ func (u *UpdateAccountRequest) IsDeactivateRequest() bool {
 
 // Validate validates a update-account request body.
 func (u *UpdateAccountRequest) Validate() error {
-	// Regular update //
+	if len(u.Status) > 0 && len(u.Contact) > 0 {
+		return acme.MalformedErr(errors.New("incompatible input; contact and " +
+			"status updates are mutually exclusive"))
+	}
 	switch {
-	case u.Contact != nil:
-		// TODO: Check contacts.
+	case len(u.Contact) > 0:
+		if err := validateContacts(u.Contact); err != nil {
+			return err
+		}
 		return nil
 	case len(u.Status) > 0:
 		if u.Status != "deactivated" {
@@ -99,16 +117,15 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Location", h.Auth.GetLink(acme.AccountLink, true, acc.GetID()))
-	api.JSON(w, acc)
 	w.WriteHeader(httpStatus)
+	api.JSON(w, acc)
 	return
 }
 
-// UpdateAccount is the api for updating an ACME account.
-func (h *Handler) UpdateAccount(w http.ResponseWriter, r *http.Request) {
+// GetUpdateAccount is the api for updating an ACME account.
+func (h *Handler) GetUpdateAccount(w http.ResponseWriter, r *http.Request) {
 	acc, ok := accountFromContext(r)
 	if !ok || acc == nil {
-		// Account does not exist //
 		api.WriteError(w, acme.AccountDoesNotExistErr(nil))
 		return
 	}
@@ -138,8 +155,8 @@ func (h *Handler) UpdateAccount(w http.ResponseWriter, r *http.Request) {
 			api.WriteError(w, err)
 			return
 		}
-
 	}
+	w.Header().Set("Location", h.Auth.GetLink(acme.AccountLink, true, acc.GetID()))
 	w.WriteHeader(http.StatusOK)
 	api.JSON(w, acc)
 	return
@@ -149,17 +166,21 @@ func (h *Handler) UpdateAccount(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetOrdersByAccount(w http.ResponseWriter, r *http.Request) {
 	acc, ok := accountFromContext(r)
 	if !ok || acc == nil {
-		// Account does not exist //
 		api.WriteError(w, acme.AccountDoesNotExistErr(nil))
 		return
 	}
 
+	accID := chi.URLParam(r, "accID")
+	if acc.ID != accID {
+		api.WriteError(w, acme.UnauthorizedErr(errors.New("account ID does not match url param")))
+		return
+	}
 	orders, err := h.Auth.GetOrdersByAccount(acc.GetID())
 	if err != nil {
 		api.WriteError(w, err)
 		return
 	}
-	api.JSON(w, orders)
 	w.WriteHeader(http.StatusOK)
+	api.JSON(w, orders)
 	return
 }

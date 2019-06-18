@@ -72,7 +72,7 @@ func (h *Handler) Route(r api.Router) {
 	}
 
 	r.MethodFunc("POST", getLink(acme.NewAccountLink, false), extractPayloadByJWK(h.NewAccount))
-	r.MethodFunc("POST", getLink(acme.AccountLink, false, "{accID}"), extractPayloadByKid(h.isPostAsGet(h.UpdateAccount)))
+	r.MethodFunc("POST", getLink(acme.AccountLink, false, "{accID}"), extractPayloadByKid(h.isPostAsGet(h.GetUpdateAccount)))
 	r.MethodFunc("POST", getLink(acme.NewOrderLink, false), extractPayloadByKid(h.NewOrder))
 	r.MethodFunc("POST", getLink(acme.OrderLink, false, "{ordID}"), extractPayloadByKid(h.isPostAsGet(h.GetOrder)))
 	r.MethodFunc("POST", getLink(acme.OrdersByAccountLink, false, "{accID}"), extractPayloadByKid(h.isPostAsGet(h.GetOrdersByAccount)))
@@ -96,8 +96,8 @@ func (h *Handler) GetNonce(w http.ResponseWriter, r *http.Request) {
 // GetDirectory is the ACME resource for returning an directory configuration
 // for client configuration.
 func (h *Handler) GetDirectory(w http.ResponseWriter, r *http.Request) {
-	api.JSON(w, h.Auth.GetDirectory())
 	w.WriteHeader(http.StatusOK)
+	api.JSON(w, h.Auth.GetDirectory())
 }
 
 // GetAuthz ACME api for retrieving an Authz.
@@ -115,8 +115,8 @@ func (h *Handler) GetAuthz(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Location", h.Auth.GetLink(acme.AuthzLink, true, authz.GetID()))
-	api.JSON(w, authz)
 	w.WriteHeader(http.StatusOK)
+	api.JSON(w, authz)
 	return
 }
 
@@ -124,7 +124,7 @@ func (h *Handler) GetAuthz(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 	acc, ok := accountFromContext(r)
 	if !ok || acc == nil {
-		api.WriteError(w, acme.AccountDoesNotExistErr(errors.Errorf("account not found")))
+		api.WriteError(w, acme.AccountDoesNotExistErr(nil))
 		return
 	}
 	payload, ok := payloadFromContext(r)
@@ -154,10 +154,10 @@ func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 	}
 
 	getLink := h.Auth.GetLink
-	w.Header().Set("Link", link(getLink(acme.AuthzLink, true, ch.GetAuthzID()), "up"))
+	w.Header().Add("Link", link(getLink(acme.AuthzLink, true, ch.GetAuthzID()), "up"))
 	w.Header().Set("Location", getLink(acme.ChallengeLink, true, ch.GetID()))
-	api.JSON(w, ch)
 	w.WriteHeader(http.StatusOK)
+	api.JSON(w, ch)
 	return
 }
 
@@ -176,7 +176,7 @@ func (h *Handler) GetCertificate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/pem-certificate-chain; charset=utf-8")
-	w.Write(certBytes)
 	w.WriteHeader(http.StatusOK)
+	w.Write(certBytes)
 	return
 }

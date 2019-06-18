@@ -72,7 +72,6 @@ func (f *FinalizeRequest) Validate() error {
 func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 	acc, ok := accountFromContext(r)
 	if !ok || acc == nil {
-		// Account does not exist //
 		api.WriteError(w, acme.AccountDoesNotExistErr(nil))
 		return
 	}
@@ -85,7 +84,7 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 	var nor NewOrderRequest
 	if err := json.Unmarshal(payload.value, &nor); err != nil {
 		api.WriteError(w, acme.MalformedErr(errors.Wrap(err,
-			"failed to unmarshal new-account request payload")))
+			"failed to unmarshal new-order request payload")))
 		return
 	}
 	if err := nor.Validate(); err != nil {
@@ -105,8 +104,8 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Location", h.Auth.GetLink(acme.OrderLink, true, order.GetID()))
-	api.JSON(w, order)
 	w.WriteHeader(http.StatusCreated)
+	api.JSON(w, order)
 	return
 }
 
@@ -114,7 +113,6 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	acc, ok := accountFromContext(r)
 	if !ok || acc == nil {
-		// Account does not exist //
 		api.WriteError(w, acme.AccountDoesNotExistErr(nil))
 		return
 	}
@@ -126,8 +124,8 @@ func (h *Handler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Location", h.Auth.GetLink(acme.OrderLink, true, order.GetID()))
-	api.JSON(w, order)
 	w.WriteHeader(http.StatusOK)
+	api.JSON(w, order)
 	return
 }
 
@@ -135,18 +133,17 @@ func (h *Handler) GetOrder(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 	acc, ok := accountFromContext(r)
 	if !ok || acc == nil {
-		// Account does not exist //
 		api.WriteError(w, acme.AccountDoesNotExistErr(nil))
 		return
 	}
 	payload, ok := payloadFromContext(r)
 	if !ok || payload == nil {
-		api.WriteError(w, acme.ServerInternalErr(errors.Errorf("payload not in request context")))
+		api.WriteError(w, acme.ServerInternalErr(errors.Errorf("payload expected in request context")))
 		return
 	}
 	var fr FinalizeRequest
 	if err := json.Unmarshal(payload.value, &fr); err != nil {
-		api.WriteError(w, acme.MalformedErr(errors.Wrap(err, "unable to parse body of finalize request")))
+		api.WriteError(w, acme.MalformedErr(errors.Wrap(err, "failed to unmarshal finalize-order request payload")))
 		return
 	}
 	if err := fr.Validate(); err != nil {
@@ -155,14 +152,14 @@ func (h *Handler) FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	oid := chi.URLParam(r, "ordID")
-	order, err := h.Auth.FinalizeOrder(acc.GetID(), oid, fr.csr)
+	o, err := h.Auth.FinalizeOrder(acc.GetID(), oid, fr.csr)
 	if err != nil {
 		api.WriteError(w, err)
 		return
 	}
 
-	w.Header().Set("Location", h.Auth.GetLink(acme.AccountLink, true, acc.GetID()))
-	api.JSON(w, order)
+	w.Header().Set("Location", h.Auth.GetLink(acme.OrderLink, true, o.ID))
 	w.WriteHeader(http.StatusOK)
+	api.JSON(w, o)
 	return
 }
