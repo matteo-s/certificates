@@ -65,10 +65,10 @@ func (h *Handler) Route(r api.Router) {
 	r.MethodFunc("GET", getLink(acme.DirectoryLink, false), h.addNonce(h.GetDirectory))
 
 	extractPayloadByJWK := func(next nextHTTP) nextHTTP {
-		return h.addNonce(h.addDirectory(h.verifyContentType(h.parseJWS(h.validateJWS(h.extractJWK(h.verifyAndExtractJWSPayload(next)))))))
+		return h.addNonce(h.addDirLink(h.verifyContentType(h.parseJWS(h.validateJWS(h.extractJWK(h.verifyAndExtractJWSPayload(next)))))))
 	}
 	extractPayloadByKid := func(next nextHTTP) nextHTTP {
-		return h.addNonce(h.addDirectory(h.verifyContentType(h.parseJWS(h.validateJWS(h.lookupJWK(h.verifyAndExtractJWSPayload(next)))))))
+		return h.addNonce(h.addDirLink(h.verifyContentType(h.parseJWS(h.validateJWS(h.lookupJWK(h.verifyAndExtractJWSPayload(next)))))))
 	}
 
 	r.MethodFunc("POST", getLink(acme.NewAccountLink, false), extractPayloadByJWK(h.NewAccount))

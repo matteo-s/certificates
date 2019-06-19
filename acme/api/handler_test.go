@@ -175,7 +175,7 @@ func (m *mockAcmeAuthority) UpdateAccount(id string, contact []string) (*acme.Ac
 
 func (m *mockAcmeAuthority) UseNonce(nonce string) error {
 	if m.useNonce != nil {
-		return m.UseNonce(nonce)
+		return m.useNonce(nonce)
 	}
 	return m.err
 }

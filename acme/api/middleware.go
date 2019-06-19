@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -31,14 +32,11 @@ func (h *Handler) addNonce(next nextHTTP) nextHTTP {
 	}
 }
 
-// addDirectory is a middleware that adds a 'Link' response reader with the
+// addDirLink is a middleware that adds a 'Link' response reader with the
 // directory index url.
-//
-// NOTE: Go http does not support multiple headers with the same name so this header
-// may be overwritten by another 'Link' addition downstream.
-func (h *Handler) addDirectory(next nextHTTP) nextHTTP {
+func (h *Handler) addDirLink(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Link", link(h.Auth.GetLink(acme.DirectoryLink, true), "index"))
+		w.Header().Add("Link", link(h.Auth.GetLink(acme.DirectoryLink, true), "index"))
 		next(w, r)
 		return
 	}
@@ -98,7 +96,7 @@ func (h *Handler) validateJWS(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		jws, ok := jwsFromContext(r)
 		if !ok || jws == nil {
-			api.WriteError(w, acme.ServerInternalErr(errors.Errorf("jws not in request context")))
+			api.WriteError(w, acme.ServerInternalErr(errors.Errorf("jws expected in request context")))
 			return
 		}
 		if len(jws.Signatures) == 0 {
@@ -121,8 +119,11 @@ func (h *Handler) validateJWS(next nextHTTP) nextHTTP {
 			return
 		}
 		hdr := sig.Protected
-		if hdr.Algorithm == "none" {
-			api.WriteError(w, acme.MalformedErr(errors.Errorf("algorithm cannot be none")))
+		switch hdr.Algorithm {
+		case jose.RS256, jose.RS384, jose.RS512, jose.ES256, jose.ES384, jose.ES512, jose.EdDSA:
+			// we good
+		default:
+			api.WriteError(w, acme.MalformedErr(errors.Errorf("unsuitable algorithm: %s", hdr.Algorithm)))
 			return
 		}
 
@@ -134,8 +135,8 @@ func (h *Handler) validateJWS(next nextHTTP) nextHTTP {
 
 		// Check that the JWS url matches the requested url.
 		jwsURL, ok := hdr.ExtraHeaders["url"].(string)
-		if !ok || len(jwsURL) == 0 {
-			api.WriteError(w, acme.MalformedErr(errors.Errorf("JWS missing url protected header")))
+		if !ok {
+			api.WriteError(w, acme.MalformedErr(errors.Errorf("jws missing url protected header")))
 			return
 		}
 		reqURL := &url.URL{Scheme: "https", Host: r.Host, Path: r.URL.Path}
@@ -170,7 +171,7 @@ func (h *Handler) extractJWK(next nextHTTP) nextHTTP {
 		}
 		jwk := jws.Signatures[0].Protected.JSONWebKey
 		if jwk == nil {
-			api.WriteError(w, acme.MalformedErr(errors.Errorf("expected jwk in protected header")))
+			api.WriteError(w, acme.MalformedErr(errors.Errorf("jwk expected in protected header")))
 			return
 		}
 		ctx = context.WithValue(ctx, jwkContextKey, jwk)
@@ -183,8 +184,8 @@ func (h *Handler) extractJWK(next nextHTTP) nextHTTP {
 			api.WriteError(w, err)
 			return
 		default:
-			if acc.IsValid() {
-				api.WriteError(w, acme.UnauthorizedErr(errors.New("acme account is not active")))
+			if !acc.IsValid() {
+				api.WriteError(w, acme.UnauthorizedErr(errors.New("account is not active")))
 				return
 			}
 			ctx = context.WithValue(ctx, accContextKey, acc)
@@ -225,7 +226,7 @@ func (h *Handler) lookupJWK(next nextHTTP) nextHTTP {
 			return
 		default:
 			if !acc.IsValid() {
-				api.WriteError(w, acme.UnauthorizedErr(errors.New("acme account is not active")))
+				api.WriteError(w, acme.UnauthorizedErr(errors.New("account is not active")))
 				return
 			}
 			ctx = context.WithValue(ctx, accContextKey, acc)
@@ -250,9 +251,14 @@ func (h *Handler) verifyAndExtractJWSPayload(next nextHTTP) nextHTTP {
 			api.WriteError(w, acme.ServerInternalErr(errors.Errorf("jwk expected in request context")))
 			return
 		}
+		fmt.Printf("jws.Signatures[0].Protected.Algorithm = %+v\n", jws.Signatures[0].Protected.Algorithm)
+		if jwk.Algorithm != jws.Signatures[0].Protected.Algorithm {
+			api.WriteError(w, acme.MalformedErr(errors.New("verifier and signature algorithm do not match")))
+			return
+		}
 		payload, err := jws.Verify(jwk)
 		if err != nil {
-			api.WriteError(w, acme.MalformedErr(errors.Errorf("failed to verify jws")))
+			api.WriteError(w, acme.MalformedErr(errors.Wrap(err, "error verifying jws")))
 			return
 		}
 		ctx := context.WithValue(r.Context(), payloadContextKey, &payloadInfo{
