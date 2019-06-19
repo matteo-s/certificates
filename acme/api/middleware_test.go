@@ -904,8 +904,8 @@ func TestHandlerValidateJWS(t *testing.T) {
 		"fail/more-than-one-signature": func(t *testing.T) test {
 			jws := &jose.JSONWebSignature{
 				Signatures: []actualjose.Signature{
-					actualjose.Signature{},
-					actualjose.Signature{},
+					{},
+					{},
 				},
 			}
 			return test{
@@ -917,7 +917,7 @@ func TestHandlerValidateJWS(t *testing.T) {
 		"fail/unprotected-header-not-empty": func(t *testing.T) test {
 			jws := &jose.JSONWebSignature{
 				Signatures: []actualjose.Signature{
-					actualjose.Signature{Unprotected: actualjose.Header{Nonce: "abc"}},
+					{Unprotected: actualjose.Header{Nonce: "abc"}},
 				},
 			}
 			return test{
@@ -929,7 +929,7 @@ func TestHandlerValidateJWS(t *testing.T) {
 		"fail/unsuitable-algorithm-none": func(t *testing.T) test {
 			jws := &jose.JSONWebSignature{
 				Signatures: []actualjose.Signature{
-					actualjose.Signature{Protected: actualjose.Header{Algorithm: "none"}},
+					{Protected: actualjose.Header{Algorithm: "none"}},
 				},
 			}
 			return test{
@@ -941,7 +941,7 @@ func TestHandlerValidateJWS(t *testing.T) {
 		"fail/unsuitable-algorithm-mac": func(t *testing.T) test {
 			jws := &jose.JSONWebSignature{
 				Signatures: []actualjose.Signature{
-					actualjose.Signature{Protected: actualjose.Header{Algorithm: jose.HS256}},
+					{Protected: actualjose.Header{Algorithm: jose.HS256}},
 				},
 			}
 			return test{
@@ -953,7 +953,7 @@ func TestHandlerValidateJWS(t *testing.T) {
 		"fail/UseNonce-error": func(t *testing.T) test {
 			jws := &jose.JSONWebSignature{
 				Signatures: []actualjose.Signature{
-					actualjose.Signature{Protected: actualjose.Header{Algorithm: jose.ES256}},
+					{Protected: actualjose.Header{Algorithm: jose.ES256}},
 				},
 			}
 			return test{
@@ -970,7 +970,7 @@ func TestHandlerValidateJWS(t *testing.T) {
 		"fail/no-url-header": func(t *testing.T) test {
 			jws := &jose.JSONWebSignature{
 				Signatures: []actualjose.Signature{
-					actualjose.Signature{Protected: actualjose.Header{Algorithm: jose.ES256}},
+					{Protected: actualjose.Header{Algorithm: jose.ES256}},
 				},
 			}
 			return test{
@@ -987,7 +987,7 @@ func TestHandlerValidateJWS(t *testing.T) {
 		"fail/url-mismatch": func(t *testing.T) test {
 			jws := &jose.JSONWebSignature{
 				Signatures: []actualjose.Signature{
-					actualjose.Signature{
+					{
 						Protected: actualjose.Header{
 							Algorithm: jose.ES256,
 							ExtraHeaders: map[jose.HeaderKey]interface{}{
@@ -1014,7 +1014,7 @@ func TestHandlerValidateJWS(t *testing.T) {
 			pub := jwk.Public()
 			jws := &jose.JSONWebSignature{
 				Signatures: []actualjose.Signature{
-					actualjose.Signature{
+					{
 						Protected: actualjose.Header{
 							Algorithm:  jose.ES256,
 							KeyID:      "bar",
@@ -1040,7 +1040,7 @@ func TestHandlerValidateJWS(t *testing.T) {
 		"fail/no-jwk-kid": func(t *testing.T) test {
 			jws := &jose.JSONWebSignature{
 				Signatures: []actualjose.Signature{
-					actualjose.Signature{
+					{
 						Protected: actualjose.Header{
 							Algorithm: jose.ES256,
 							ExtraHeaders: map[jose.HeaderKey]interface{}{
@@ -1064,7 +1064,7 @@ func TestHandlerValidateJWS(t *testing.T) {
 		"ok": func(t *testing.T) test {
 			jws := &jose.JSONWebSignature{
 				Signatures: []actualjose.Signature{
-					actualjose.Signature{
+					{
 						Protected: actualjose.Header{
 							Algorithm: jose.ES256,
 							KeyID:     "bar",

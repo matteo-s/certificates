@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/cli/crypto/tlsutil"
@@ -46,6 +47,7 @@ type Config struct {
 	DNSNames         []string            `json:"dnsNames"`
 	Logger           json.RawMessage     `json:"logger,omitempty"`
 	DB               *db.Config          `json:"db,omitempty"`
+	ACME             *acme.Config        `json:"acme,omitempty"`
 	Monitoring       json.RawMessage     `json:"monitoring,omitempty"`
 	AuthorityConfig  *AuthConfig         `json:"authority,omitempty"`
 	TLS              *tlsutil.TLSOptions `json:"tls,omitempty"`

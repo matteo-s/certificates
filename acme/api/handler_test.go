@@ -257,7 +257,7 @@ func TestHandlerGetAuthz(t *testing.T) {
 		Expires:  expiry.Format(time.RFC3339),
 		Wildcard: false,
 		Challenges: []*acme.Challenge{
-			&acme.Challenge{
+			{
 				Type:    "http-01",
 				Status:  "pending",
 				Token:   "tok2",
@@ -265,7 +265,7 @@ func TestHandlerGetAuthz(t *testing.T) {
 				ID:      "chHTTP01ID",
 				AuthzID: "authzID",
 			},
-			&acme.Challenge{
+			{
 				Type:    "dns-01",
 				Status:  "pending",
 				Token:   "tok2",

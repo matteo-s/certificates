@@ -30,10 +30,7 @@ func (n *NewAccountRequest) Validate() error {
 	if n.OnlyReturnExisting && len(n.Contact) > 0 {
 		return acme.MalformedErr(errors.New("incompatible input; onlyReturnExisting must be alone"))
 	}
-	if err := validateContacts(n.Contact); err != nil {
-		return err
-	}
-	return nil
+	return validateContacts(n.Contact)
 }
 
 // UpdateAccountRequest represents an update-account request.

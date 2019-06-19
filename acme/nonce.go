@@ -10,8 +10,6 @@ import (
 	"github.com/smallstep/nosql/database"
 )
 
-var nonceLen = 32
-
 // nonce contains nonce metadata used in the ACME protocol.
 type nonce struct {
 	ID      string
@@ -51,12 +49,12 @@ func newNonce(db nosql.DB) (*nonce, error) {
 func useNonce(db nosql.DB, nonce string) error {
 	err := db.Update(&database.Tx{
 		Operations: []*database.TxEntry{
-			&database.TxEntry{
+			{
 				Bucket: nonceTable,
 				Key:    []byte(nonce),
 				Cmd:    database.Get,
 			},
-			&database.TxEntry{
+			{
 				Bucket: nonceTable,
 				Key:    []byte(nonce),
 				Cmd:    database.Delete,

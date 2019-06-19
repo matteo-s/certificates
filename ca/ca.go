@@ -116,26 +116,29 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 		routerHandler.Route(r)
 	})
 
-	//Add ACME api endpoints in /acme and /1.0/acme
-	dns := config.DNSNames[0]
-	u, err := url.Parse(config.Address)
-	if err != nil {
-		return nil, err
-	}
-	port := u.Port()
-	if port != "" && port != "443" {
-		dns = fmt.Sprintf("%s:%s", dns, port)
-	}
-	acmeAuth := acme.NewAuthority(auth.GetDatabase().(nosql.DB), dns, "acme", auth)
-	acmeRouterHandler := acmeAPI.New(acmeAuth)
-	acmeRouterHandler.Route(mux)
-	mux.Route("/acme", func(r chi.Router) {
-		routerHandler.Route(r)
-	})
-	mux.Route("/1.0/acme", func(r chi.Router) {
-		routerHandler.Route(r)
-	})
+	if config.ACME != nil {
+		//Add ACME api endpoints in /acme and /1.0/acme
+		dns := config.DNSNames[0]
+		u, err := url.Parse("https://" + config.Address)
+		if err != nil {
+			return nil, err
+		}
+		port := u.Port()
+		if port != "" && port != "443" {
+			dns = fmt.Sprintf("%s:%s", dns, port)
+		}
+		prefix := config.ACME.Prefix
+		acmeAuth := acme.NewAuthority(auth.GetDatabase().(nosql.DB), dns, prefix, auth)
+		acmeRouterHandler := acmeAPI.New(acmeAuth)
+		acmeRouterHandler.Route(mux)
+		mux.Route("/"+prefix, func(r chi.Router) {
+			routerHandler.Route(r)
+		})
+		mux.Route("/1.0/"+prefix, func(r chi.Router) {
+			routerHandler.Route(r)
+		})
 
+	}
 	// Add monitoring if configured
 	if len(config.Monitoring) > 0 {
 		m, err := monitoring.New(config.Monitoring)

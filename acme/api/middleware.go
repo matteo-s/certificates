@@ -271,7 +271,7 @@ func (h *Handler) verifyAndExtractJWSPayload(next nextHTTP) nextHTTP {
 	}
 }
 
-// isPostAsGet asserts that the request is a PostAsGet (emtpy JWS payload).
+// isPostAsGet asserts that the request is a PostAsGet (empty JWS payload).
 func (h *Handler) isPostAsGet(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		payload, ok := payloadFromContext(r)

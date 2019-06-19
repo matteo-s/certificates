@@ -36,8 +36,8 @@ func TestNewOrderRequestValidate(t *testing.T) {
 			return test{
 				nor: &NewOrderRequest{
 					Identifiers: []acme.Identifier{
-						acme.Identifier{Type: "dns", Value: "example.com"},
-						acme.Identifier{Type: "foo", Value: "bar.com"},
+						{Type: "dns", Value: "example.com"},
+						{Type: "foo", Value: "bar.com"},
 					},
 				},
 				err: acme.MalformedErr(errors.Errorf("identifier type unsupported: foo")),
@@ -48,8 +48,8 @@ func TestNewOrderRequestValidate(t *testing.T) {
 			return test{
 				nor: &NewOrderRequest{
 					Identifiers: []acme.Identifier{
-						acme.Identifier{Type: "dns", Value: "example.com"},
-						acme.Identifier{Type: "dns", Value: "bar.com"},
+						{Type: "dns", Value: "example.com"},
+						{Type: "dns", Value: "bar.com"},
 					},
 					NotAfter: naf,
 				},
@@ -63,8 +63,8 @@ func TestNewOrderRequestValidate(t *testing.T) {
 			return test{
 				nor: &NewOrderRequest{
 					Identifiers: []acme.Identifier{
-						acme.Identifier{Type: "dns", Value: "example.com"},
-						acme.Identifier{Type: "dns", Value: "bar.com"},
+						{Type: "dns", Value: "example.com"},
+						{Type: "dns", Value: "bar.com"},
 					},
 					NotAfter:  naf,
 					NotBefore: nbf,
@@ -79,8 +79,8 @@ func TestNewOrderRequestValidate(t *testing.T) {
 			return test{
 				nor: &NewOrderRequest{
 					Identifiers: []acme.Identifier{
-						acme.Identifier{Type: "dns", Value: "example.com"},
-						acme.Identifier{Type: "dns", Value: "bar.com"},
+						{Type: "dns", Value: "example.com"},
+						{Type: "dns", Value: "bar.com"},
 					},
 				},
 			}
@@ -91,8 +91,8 @@ func TestNewOrderRequestValidate(t *testing.T) {
 			return test{
 				nor: &NewOrderRequest{
 					Identifiers: []acme.Identifier{
-						acme.Identifier{Type: "dns", Value: "example.com"},
-						acme.Identifier{Type: "dns", Value: "bar.com"},
+						{Type: "dns", Value: "example.com"},
+						{Type: "dns", Value: "bar.com"},
 					},
 					NotAfter:  naf,
 					NotBefore: nbf,
@@ -187,11 +187,11 @@ func TestHandlerGetOrder(t *testing.T) {
 		NotBefore: nbf.Format(time.RFC3339),
 		NotAfter:  naf.Format(time.RFC3339),
 		Identifiers: []acme.Identifier{
-			acme.Identifier{
+			{
 				Type:  "dns",
 				Value: "example.com",
 			},
-			acme.Identifier{
+			{
 				Type:  "dns",
 				Value: "*.smallstep.com",
 			},
@@ -306,8 +306,8 @@ func TestHandlerNewOrder(t *testing.T) {
 		NotBefore: nbf.Format(time.RFC3339),
 		NotAfter:  naf.Format(time.RFC3339),
 		Identifiers: []acme.Identifier{
-			acme.Identifier{Type: "dns", Value: "example.com"},
-			acme.Identifier{Type: "dns", Value: "bar.com"},
+			{Type: "dns", Value: "example.com"},
+			{Type: "dns", Value: "bar.com"},
 		},
 		Status:         "pending",
 		Authorizations: []string{"foo", "bar"},
@@ -383,8 +383,8 @@ func TestHandlerNewOrder(t *testing.T) {
 			acc := &acme.Account{ID: "accID"}
 			nor := &NewOrderRequest{
 				Identifiers: []acme.Identifier{
-					acme.Identifier{Type: "dns", Value: "example.com"},
-					acme.Identifier{Type: "dns", Value: "bar.com"},
+					{Type: "dns", Value: "example.com"},
+					{Type: "dns", Value: "bar.com"},
 				},
 			}
 			b, err := json.Marshal(nor)
@@ -408,8 +408,8 @@ func TestHandlerNewOrder(t *testing.T) {
 			acc := &acme.Account{ID: "accID"}
 			nor := &NewOrderRequest{
 				Identifiers: []acme.Identifier{
-					acme.Identifier{Type: "dns", Value: "example.com"},
-					acme.Identifier{Type: "dns", Value: "bar.com"},
+					{Type: "dns", Value: "example.com"},
+					{Type: "dns", Value: "bar.com"},
 				},
 				NotBefore: nbf,
 				NotAfter:  naf,
@@ -442,8 +442,8 @@ func TestHandlerNewOrder(t *testing.T) {
 			acc := &acme.Account{ID: "accID"}
 			nor := &NewOrderRequest{
 				Identifiers: []acme.Identifier{
-					acme.Identifier{Type: "dns", Value: "example.com"},
-					acme.Identifier{Type: "dns", Value: "bar.com"},
+					{Type: "dns", Value: "example.com"},
+					{Type: "dns", Value: "bar.com"},
 				},
 			}
 			b, err := json.Marshal(nor)
@@ -517,8 +517,8 @@ func TestHandlerFinalizeOrder(t *testing.T) {
 		NotBefore: nbf.Format(time.RFC3339),
 		NotAfter:  naf.Format(time.RFC3339),
 		Identifiers: []acme.Identifier{
-			acme.Identifier{Type: "dns", Value: "example.com"},
-			acme.Identifier{Type: "dns", Value: "bar.com"},
+			{Type: "dns", Value: "example.com"},
+			{Type: "dns", Value: "bar.com"},
 		},
 		Status:         "valid",
 		Authorizations: []string{"foo", "bar"},

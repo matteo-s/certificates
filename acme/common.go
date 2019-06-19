@@ -8,6 +8,12 @@ import (
 	"github.com/smallstep/cli/crypto/randutil"
 )
 
+// Config represents the JSON attributes used for configuring a step-ca ACME
+// API.
+type Config struct {
+	Prefix string `json:"prefix"`
+}
+
 // SignAuthority is the interface implemented by a CA authority.
 type SignAuthority interface {
 	Sign(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error)
@@ -31,21 +37,18 @@ var (
 )
 
 var (
-	statusValid       = "valid"
-	statusInvalid     = "invalid"
-	statusRevoked     = "revoked"
-	statusExpired     = "expired"
-	statusPending     = "pending"
-	statusProcessing  = "processing"
+	statusValid   = "valid"
+	statusInvalid = "invalid"
+	//statusRevoked     = "revoked"
+	//statusExpired     = "expired"
+	statusPending = "pending"
+	//statusProcessing  = "processing"
 	statusDeactivated = "deactivated"
-	statusActive      = "active"
-	statusReady       = "ready"
+	//statusActive      = "active"
+	statusReady = "ready"
 )
 
-var (
-	idLen  = 32
-	tokLen = 32
-)
+var idLen = 32
 
 func randID() (val string, err error) {
 	val, err = randutil.Alphanumeric(idLen)

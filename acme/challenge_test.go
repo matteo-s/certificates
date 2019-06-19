@@ -61,7 +61,7 @@ func TestNewHTTP01Challenge(t *testing.T) {
 		err *Error
 	}
 	tests := map[string]test{
-		"fail/store-error": test{
+		"fail/store-error": {
 			ops: ops,
 			db: &db.MockNoSQLDB{
 				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
@@ -70,7 +70,7 @@ func TestNewHTTP01Challenge(t *testing.T) {
 			},
 			err: ServerInternalErr(errors.New("error saving acme challenge: force")),
 		},
-		"ok": test{
+		"ok": {
 			ops: ops,
 			db: &db.MockNoSQLDB{
 				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
@@ -125,7 +125,7 @@ func TestNewDNS01Challenge(t *testing.T) {
 		err *Error
 	}
 	tests := map[string]test{
-		"fail/store-error": test{
+		"fail/store-error": {
 			ops: ops,
 			db: &db.MockNoSQLDB{
 				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
@@ -134,7 +134,7 @@ func TestNewDNS01Challenge(t *testing.T) {
 			},
 			err: ServerInternalErr(errors.New("error saving acme challenge: force")),
 		},
-		"ok": test{
+		"ok": {
 			ops: ops,
 			db: &db.MockNoSQLDB{
 				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {

@@ -22,8 +22,8 @@ func defaultOrderOps() OrderOptions {
 	return OrderOptions{
 		AccountID: "accID",
 		Identifiers: []Identifier{
-			Identifier{Type: "dns", Value: "acme.example.com"},
-			Identifier{Type: "dns", Value: "step.example.com"},
+			{Type: "dns", Value: "acme.example.com"},
+			{Type: "dns", Value: "step.example.com"},
 		},
 		NotBefore: time.Now().UTC().Round(time.Second),
 		NotAfter:  time.Now().UTC().Add(certDuration).Round(time.Second),
@@ -667,9 +667,9 @@ func TestOrderUpdateStatus(t *testing.T) {
 			_az2.baseAuthz.Status = statusValid
 
 			b1, err := json.Marshal(az1)
-			assert.Fatal(t, ok)
+			assert.FatalError(t, err)
 			b2, err := json.Marshal(az2)
-			assert.Fatal(t, ok)
+			assert.FatalError(t, err)
 
 			count := 0
 			return test{
@@ -724,9 +724,9 @@ func TestOrderUpdateStatus(t *testing.T) {
 			_az2.baseAuthz.Status = statusInvalid
 
 			b1, err := json.Marshal(az1)
-			assert.Fatal(t, ok)
+			assert.FatalError(t, err)
 			b2, err := json.Marshal(az2)
-			assert.Fatal(t, ok)
+			assert.FatalError(t, err)
 
 			_o := *o
 			clone := &_o
@@ -852,9 +852,9 @@ func TestOrderFinalize(t *testing.T) {
 			_az2.baseAuthz.Status = statusValid
 
 			b1, err := json.Marshal(az1)
-			assert.Fatal(t, ok)
+			assert.FatalError(t, err)
 			b2, err := json.Marshal(az2)
-			assert.Fatal(t, ok)
+			assert.FatalError(t, err)
 
 			count := 0
 			return test{
