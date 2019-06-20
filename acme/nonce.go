@@ -26,7 +26,7 @@ func newNonce(db nosql.DB) (*nonce, error) {
 	id := base64.RawURLEncoding.EncodeToString([]byte(_id))
 	n := &nonce{
 		ID:      id,
-		Created: time.Now().UTC().Round(time.Second),
+		Created: round(time.Now().UTC()),
 	}
 	b, err := json.Marshal(n)
 	if err != nil {

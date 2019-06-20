@@ -25,8 +25,8 @@ func defaultOrderOps() OrderOptions {
 			{Type: "dns", Value: "acme.example.com"},
 			{Type: "dns", Value: "step.example.com"},
 		},
-		NotBefore: time.Now().UTC().Round(time.Second),
-		NotAfter:  time.Now().UTC().Add(certDuration).Round(time.Second),
+		NotBefore: round(time.Now().UTC()),
+		NotAfter:  round(time.Now().UTC().Add(certDuration)),
 	}
 }
 
@@ -162,7 +162,7 @@ func TestOrderToACME(t *testing.T) {
 		"ok/cert": func(t *testing.T) test {
 			o, err := newO()
 			assert.FatalError(t, err)
-			o.Status = statusValid
+			o.Status = StatusValid
 			o.Certificate = "cert-id"
 			return test{o: o}
 		},
@@ -444,7 +444,7 @@ func TestNewOrder(t *testing.T) {
 			} else {
 				if assert.Nil(t, tc.err) {
 					assert.Equals(t, o.AccountID, tc.ops.AccountID)
-					assert.Equals(t, o.Status, statusPending)
+					assert.Equals(t, o.Status, StatusPending)
 					assert.Equals(t, o.Identifiers, tc.ops.Identifiers)
 					assert.Equals(t, o.Error, nil)
 					assert.Equals(t, o.Certificate, "")
@@ -569,7 +569,7 @@ func TestOrderUpdateStatus(t *testing.T) {
 		"fail/already-invalid": func(t *testing.T) test {
 			o, err := newO()
 			assert.FatalError(t, err)
-			o.Status = statusInvalid
+			o.Status = StatusInvalid
 			return test{
 				o:   o,
 				res: o,
@@ -578,7 +578,7 @@ func TestOrderUpdateStatus(t *testing.T) {
 		"fail/already-valid": func(t *testing.T) test {
 			o, err := newO()
 			assert.FatalError(t, err)
-			o.Status = statusValid
+			o.Status = StatusValid
 			return test{
 				o:   o,
 				res: o,
@@ -587,7 +587,7 @@ func TestOrderUpdateStatus(t *testing.T) {
 		"fail/unexpected-status": func(t *testing.T) test {
 			o, err := newO()
 			assert.FatalError(t, err)
-			o.Status = statusDeactivated
+			o.Status = StatusDeactivated
 			return test{
 				o:   o,
 				res: o,
@@ -617,7 +617,7 @@ func TestOrderUpdateStatus(t *testing.T) {
 			_o := *o
 			clone := &_o
 			clone.Error = MalformedErr(errors.New("order has expired"))
-			clone.Status = statusInvalid
+			clone.Status = StatusInvalid
 			return test{
 				o:   o,
 				res: clone,
@@ -664,7 +664,7 @@ func TestOrderUpdateStatus(t *testing.T) {
 
 			_az2, ok := az2.(*dnsAuthz)
 			assert.Fatal(t, ok)
-			_az2.baseAuthz.Status = statusValid
+			_az2.baseAuthz.Status = StatusValid
 
 			b1, err := json.Marshal(az1)
 			assert.FatalError(t, err)
@@ -721,7 +721,7 @@ func TestOrderUpdateStatus(t *testing.T) {
 
 			_az2, ok := az2.(*dnsAuthz)
 			assert.Fatal(t, ok)
-			_az2.baseAuthz.Status = statusInvalid
+			_az2.baseAuthz.Status = StatusInvalid
 
 			b1, err := json.Marshal(az1)
 			assert.FatalError(t, err)
@@ -730,7 +730,7 @@ func TestOrderUpdateStatus(t *testing.T) {
 
 			_o := *o
 			clone := &_o
-			clone.Status = statusInvalid
+			clone.Status = StatusInvalid
 
 			count := 0
 			return test{
@@ -811,7 +811,7 @@ func TestOrderFinalize(t *testing.T) {
 		"fail/already-invalid": func(t *testing.T) test {
 			o, err := newO()
 			assert.FatalError(t, err)
-			o.Status = statusInvalid
+			o.Status = StatusInvalid
 			return test{
 				o:   o,
 				err: OrderNotReadyErr(errors.Errorf("order %s has been abandoned", o.ID)),
@@ -820,7 +820,7 @@ func TestOrderFinalize(t *testing.T) {
 		"ok/already-valid": func(t *testing.T) test {
 			o, err := newO()
 			assert.FatalError(t, err)
-			o.Status = statusValid
+			o.Status = StatusValid
 			o.Certificate = "cert-id"
 			return test{
 				o:   o,
@@ -849,7 +849,7 @@ func TestOrderFinalize(t *testing.T) {
 
 			_az2, ok := az2.(*dnsAuthz)
 			assert.Fatal(t, ok)
-			_az2.baseAuthz.Status = statusValid
+			_az2.baseAuthz.Status = StatusValid
 
 			b1, err := json.Marshal(az1)
 			assert.FatalError(t, err)
@@ -888,7 +888,7 @@ func TestOrderFinalize(t *testing.T) {
 		"fail/ready/csr-names-match-error": func(t *testing.T) test {
 			o, err := newO()
 			assert.FatalError(t, err)
-			o.Status = statusReady
+			o.Status = StatusReady
 
 			csr := &x509.CertificateRequest{
 				Subject: pkix.Name{
@@ -905,7 +905,7 @@ func TestOrderFinalize(t *testing.T) {
 		"fail/ready/csr-names-match-error-2": func(t *testing.T) test {
 			o, err := newO()
 			assert.FatalError(t, err)
-			o.Status = statusReady
+			o.Status = StatusReady
 
 			csr := &x509.CertificateRequest{
 				Subject: pkix.Name{
@@ -922,7 +922,7 @@ func TestOrderFinalize(t *testing.T) {
 		"fail/ready/sign-cert-error": func(t *testing.T) test {
 			o, err := newO()
 			assert.FatalError(t, err)
-			o.Status = statusReady
+			o.Status = StatusReady
 
 			csr := &x509.CertificateRequest{
 				Subject: pkix.Name{
@@ -942,7 +942,7 @@ func TestOrderFinalize(t *testing.T) {
 		"fail/ready/store-cert-error": func(t *testing.T) test {
 			o, err := newO()
 			assert.FatalError(t, err)
-			o.Status = statusReady
+			o.Status = StatusReady
 
 			csr := &x509.CertificateRequest{
 				Subject: pkix.Name{
@@ -977,7 +977,7 @@ func TestOrderFinalize(t *testing.T) {
 		"fail/ready/store-order-error": func(t *testing.T) test {
 			o, err := newO()
 			assert.FatalError(t, err)
-			o.Status = statusReady
+			o.Status = StatusReady
 
 			csr := &x509.CertificateRequest{
 				Subject: pkix.Name{
@@ -1017,7 +1017,7 @@ func TestOrderFinalize(t *testing.T) {
 		"ok/ready/sign": func(t *testing.T) test {
 			o, err := newO()
 			assert.FatalError(t, err)
-			o.Status = statusReady
+			o.Status = StatusReady
 
 			csr := &x509.CertificateRequest{
 				Subject: pkix.Name{
@@ -1038,7 +1038,7 @@ func TestOrderFinalize(t *testing.T) {
 
 			_o := *o
 			clone := &_o
-			clone.Status = statusValid
+			clone.Status = StatusValid
 
 			count := 0
 			return test{

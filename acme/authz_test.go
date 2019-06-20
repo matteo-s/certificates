@@ -139,7 +139,7 @@ func TestAuthzClone(t *testing.T) {
 	assert.Equals(t, clone.getCreated(), az.getCreated())
 	assert.Equals(t, clone.getChallenges(), az.getChallenges())
 
-	clone.Status = statusValid
+	clone.Status = StatusValid
 
 	assert.NotEquals(t, clone.getStatus(), az.getStatus())
 }
@@ -221,7 +221,7 @@ func TestNewAuthz(t *testing.T) {
 
 							assert.Equals(t, az.getID(), string(key))
 							assert.Equals(t, az.getAccountID(), accID)
-							assert.Equals(t, az.getStatus(), statusPending)
+							assert.Equals(t, az.getStatus(), StatusPending)
 							assert.Equals(t, az.getIdentifier(), iden)
 							assert.Equals(t, az.getWildcard(), false)
 
@@ -258,7 +258,7 @@ func TestNewAuthz(t *testing.T) {
 
 							assert.Equals(t, az.getID(), string(key))
 							assert.Equals(t, az.getAccountID(), accID)
-							assert.Equals(t, az.getStatus(), statusPending)
+							assert.Equals(t, az.getStatus(), StatusPending)
 							assert.Equals(t, az.getIdentifier(), iden)
 							assert.Equals(t, az.getWildcard(), true)
 
@@ -295,7 +295,7 @@ func TestNewAuthz(t *testing.T) {
 				if assert.Nil(t, tc.err) {
 					assert.Equals(t, az.getAccountID(), accID)
 					assert.Equals(t, az.getType(), "dns")
-					assert.Equals(t, az.getStatus(), statusPending)
+					assert.Equals(t, az.getStatus(), StatusPending)
 
 					assert.True(t, az.getCreated().Before(time.Now().UTC().Add(time.Minute)))
 					assert.True(t, az.getCreated().After(time.Now().UTC().Add(-1*time.Minute)))
@@ -413,7 +413,7 @@ func TestAuthzToACME(t *testing.T) {
 				if assert.Nil(t, tc.err) {
 					assert.Equals(t, acmeAz.ID, az.getID())
 					assert.Equals(t, acmeAz.Identifier, iden)
-					assert.Equals(t, acmeAz.Status, statusPending)
+					assert.Equals(t, acmeAz.Status, StatusPending)
 
 					acmeCh1, err := ch1.toACME(nil, dir)
 					assert.FatalError(t, err)
@@ -604,7 +604,7 @@ func TestAuthzUpdateStatus(t *testing.T) {
 			assert.FatalError(t, err)
 			_az, ok := az.(*dnsAuthz)
 			assert.Fatal(t, ok)
-			_az.baseAuthz.Status = statusInvalid
+			_az.baseAuthz.Status = StatusInvalid
 			return test{
 				az:  az,
 				res: az,
@@ -615,7 +615,7 @@ func TestAuthzUpdateStatus(t *testing.T) {
 			assert.FatalError(t, err)
 			_az, ok := az.(*dnsAuthz)
 			assert.Fatal(t, ok)
-			_az.baseAuthz.Status = statusValid
+			_az.baseAuthz.Status = StatusValid
 			return test{
 				az:  az,
 				res: az,
@@ -626,7 +626,7 @@ func TestAuthzUpdateStatus(t *testing.T) {
 			assert.FatalError(t, err)
 			_az, ok := az.(*dnsAuthz)
 			assert.Fatal(t, ok)
-			_az.baseAuthz.Status = statusReady
+			_az.baseAuthz.Status = StatusReady
 			return test{
 				az:  az,
 				res: az,
@@ -659,7 +659,7 @@ func TestAuthzUpdateStatus(t *testing.T) {
 
 			clone := az.clone()
 			clone.Error = MalformedErr(errors.New("authz has expired"))
-			clone.Status = statusInvalid
+			clone.Status = StatusInvalid
 			return test{
 				az:  az,
 				res: clone.parent(),
@@ -713,11 +713,11 @@ func TestAuthzUpdateStatus(t *testing.T) {
 
 			_ch, ok := ch2.(*dns01Challenge)
 			assert.Fatal(t, ok)
-			_ch.baseChallenge.Status = statusValid
+			_ch.baseChallenge.Status = StatusValid
 			chb, err := json.Marshal(ch2)
 
 			clone := az.clone()
-			clone.Status = statusValid
+			clone.Status = StatusValid
 
 			count = 0
 			return test{

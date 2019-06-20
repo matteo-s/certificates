@@ -246,7 +246,7 @@ func TestHandlerGetDirectory(t *testing.T) {
 }
 
 func TestHandlerGetAuthz(t *testing.T) {
-	expiry := time.Now().UTC().Add(6 * time.Hour).Round(time.Second)
+	expiry := time.Now().UTC().Add(6 * time.Hour)
 	az := acme.Authz{
 		ID: "authzID",
 		Identifier: acme.Identifier{
@@ -553,16 +553,6 @@ func TestHandlerGetChallenge(t *testing.T) {
 				problem:    acme.ServerInternalErr(errors.New("payload expected in request context")),
 			}
 		},
-		"fail/malformed-payload": func(t *testing.T) test {
-			acc := &acme.Account{ID: "accID"}
-			ctx := context.WithValue(context.Background(), accContextKey, acc)
-			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{})
-			return test{
-				ctx:        ctx,
-				statusCode: 400,
-				problem:    acme.MalformedErr(errors.Errorf("payload must be either post-as-get or empty JSON blob")),
-			}
-		},
 		"fail/validate-challenge-error": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accID"}
 			ctx := context.WithValue(context.Background(), accContextKey, acc)
@@ -600,7 +590,7 @@ func TestHandlerGetChallenge(t *testing.T) {
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			ch := ch()
 			ch.Status = "valid"
-			ch.Validated = time.Now().UTC().Round(time.Second).Format(time.RFC3339)
+			ch.Validated = time.Now().UTC().Format(time.RFC3339)
 			count := 0
 			return test{
 				auth: &mockAcmeAuthority{
@@ -701,7 +691,7 @@ func TestHandlerGetChallenge(t *testing.T) {
 				expB, err := json.Marshal(tc.ch)
 				assert.FatalError(t, err)
 				assert.Equals(t, bytes.TrimSpace(body), expB)
-				assert.Equals(t, res.Header["Link"], []string{fmt.Sprintf("<https://ca.smallstep.com/acme/authz/%s>;\"up\"", tc.ch.AuthzID)})
+				assert.Equals(t, res.Header["Link"], []string{fmt.Sprintf("<https://ca.smallstep.com/acme/authz/%s>;rel=\"up\"", tc.ch.AuthzID)})
 				assert.Equals(t, res.Header["Location"], []string{url})
 			}
 		})

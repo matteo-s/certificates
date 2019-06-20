@@ -51,7 +51,7 @@ func (n *NewOrderRequest) Validate() error {
 
 // FinalizeRequest captures the body for a Finalize order request.
 type FinalizeRequest struct {
-	CSR string
+	CSR string `json:"csr"`
 	csr *x509.CertificateRequest
 }
 
@@ -65,6 +65,9 @@ func (f *FinalizeRequest) Validate() error {
 	f.csr, err = x509.ParseCertificateRequest(csrBytes)
 	if err != nil {
 		return acme.MalformedErr(errors.Wrap(err, "unable to parse csr"))
+	}
+	if err = f.csr.CheckSignature(); err != nil {
+		return acme.MalformedErr(errors.Wrap(err, "csr failed signature check"))
 	}
 	return nil
 }

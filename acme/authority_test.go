@@ -765,7 +765,7 @@ func TestAuthorityGetAuthz(t *testing.T) {
 			assert.FatalError(t, err)
 			_az, ok := az.(*dnsAuthz)
 			assert.Fatal(t, ok)
-			_az.baseAuthz.Status = statusValid
+			_az.baseAuthz.Status = StatusValid
 			b, err := json.Marshal(az)
 			assert.FatalError(t, err)
 
@@ -1007,7 +1007,7 @@ func TestAuthorityGetOrdersByAccount(t *testing.T) {
 			foo, err := newO()
 			bar, err := newO()
 			baz, err := newO()
-			bar.Status = statusInvalid
+			bar.Status = StatusInvalid
 
 			auth := NewAuthority(&db.MockNoSQLDB{
 				MGet: func(bucket, key []byte) ([]byte, error) {
@@ -1138,7 +1138,7 @@ func TestAuthorityFinalizeOrder(t *testing.T) {
 		"ok": func(t *testing.T) test {
 			o, err := newO()
 			assert.FatalError(t, err)
-			o.Status = statusValid
+			o.Status = StatusValid
 			o.Certificate = "certID"
 			b, err := json.Marshal(o)
 			assert.FatalError(t, err)
@@ -1232,7 +1232,7 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 			assert.FatalError(t, err)
 			_ch, ok := ch.(*http01Challenge)
 			assert.Fatal(t, ok)
-			_ch.baseChallenge.Status = statusInvalid
+			_ch.baseChallenge.Status = StatusInvalid
 			b, err := json.Marshal(ch)
 			assert.FatalError(t, err)
 			auth := NewAuthority(&db.MockNoSQLDB{
@@ -1254,8 +1254,8 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 			assert.FatalError(t, err)
 			_ch, ok := ch.(*http01Challenge)
 			assert.Fatal(t, ok)
-			_ch.baseChallenge.Status = statusValid
-			_ch.baseChallenge.Validated = time.Now().UTC().Round(time.Second)
+			_ch.baseChallenge.Status = StatusValid
+			_ch.baseChallenge.Validated = round(time.Now().UTC())
 			b, err := json.Marshal(ch)
 			assert.FatalError(t, err)
 			auth := NewAuthority(&db.MockNoSQLDB{
@@ -1456,8 +1456,8 @@ func TestAuthorityDeactivateAccount(t *testing.T) {
 
 			_acc := *acc
 			clone := &_acc
-			clone.Status = statusDeactivated
-			clone.Deactivated = time.Now().UTC().Round(time.Second)
+			clone.Status = StatusDeactivated
+			clone.Deactivated = round(time.Now().UTC())
 			auth := NewAuthority(&db.MockNoSQLDB{
 				MGet: func(bucket, key []byte) ([]byte, error) {
 					return b, nil

@@ -96,7 +96,7 @@ func TestNewHTTP01Challenge(t *testing.T) {
 					assert.Equals(t, ch.getAuthzID(), ops.AuthzID)
 					assert.Equals(t, ch.getType(), "http-01")
 					assert.Equals(t, ch.getValue(), "acme.example.com")
-					assert.Equals(t, ch.getStatus(), statusPending)
+					assert.Equals(t, ch.getStatus(), StatusPending)
 
 					assert.True(t, ch.getValidated().IsZero())
 					assert.True(t, ch.getCreated().Before(time.Now().UTC().Add(time.Minute)))
@@ -160,7 +160,7 @@ func TestNewDNS01Challenge(t *testing.T) {
 					assert.Equals(t, ch.getAuthzID(), ops.AuthzID)
 					assert.Equals(t, ch.getType(), "dns-01")
 					assert.Equals(t, ch.getValue(), "acme.example.com")
-					assert.Equals(t, ch.getStatus(), statusPending)
+					assert.Equals(t, ch.getStatus(), StatusPending)
 
 					assert.True(t, ch.getValidated().IsZero())
 					assert.True(t, ch.getCreated().Before(time.Now().UTC().Add(time.Minute)))
@@ -181,7 +181,7 @@ func TestChallengeToACME(t *testing.T) {
 	assert.FatalError(t, err)
 	_httpCh, ok := httpCh.(*http01Challenge)
 	assert.Fatal(t, ok)
-	_httpCh.baseChallenge.Validated = time.Now().UTC().Round(time.Second)
+	_httpCh.baseChallenge.Validated = round(time.Now().UTC())
 
 	dnsCh, err := newDNSCh()
 	assert.FatalError(t, err)
@@ -324,7 +324,7 @@ func TestChallengeClone(t *testing.T) {
 	assert.Equals(t, clone.getCreated(), ch.getCreated())
 	assert.Equals(t, clone.getValidated(), ch.getValidated())
 
-	clone.Status = statusValid
+	clone.Status = StatusValid
 
 	assert.NotEquals(t, clone.getStatus(), ch.getStatus())
 }
@@ -591,7 +591,7 @@ func TestHTTP01Validate(t *testing.T) {
 			assert.FatalError(t, err)
 			_ch, ok := ch.(*http01Challenge)
 			assert.Fatal(t, ok)
-			_ch.baseChallenge.Status = statusValid
+			_ch.baseChallenge.Status = StatusValid
 			return test{
 				ch:  ch,
 				res: ch,
@@ -602,7 +602,7 @@ func TestHTTP01Validate(t *testing.T) {
 			assert.FatalError(t, err)
 			_ch, ok := ch.(*http01Challenge)
 			assert.Fatal(t, ok)
-			_ch.baseChallenge.Status = statusInvalid
+			_ch.baseChallenge.Status = StatusInvalid
 			return test{
 				ch:  ch,
 				err: MalformedErr(errors.New("challenge already has invalid status")),
@@ -763,7 +763,7 @@ func TestHTTP01Validate(t *testing.T) {
 			assert.FatalError(t, err)
 
 			baseClone := ch.clone()
-			baseClone.Status = statusValid
+			baseClone.Status = StatusValid
 			newCh := &http01Challenge{baseClone}
 
 			return test{
@@ -785,7 +785,7 @@ func TestHTTP01Validate(t *testing.T) {
 
 						httpCh, err := unmarshalChallenge(newval)
 						assert.FatalError(t, err)
-						assert.Equals(t, httpCh.getStatus(), statusValid)
+						assert.Equals(t, httpCh.getStatus(), StatusValid)
 						assert.True(t, httpCh.getValidated().Before(time.Now().UTC().Add(time.Minute)))
 						assert.True(t, httpCh.getValidated().After(time.Now().UTC().Add(-1*time.Second)))
 
@@ -838,7 +838,7 @@ func TestDNS01Validate(t *testing.T) {
 			assert.FatalError(t, err)
 			_ch, ok := ch.(*dns01Challenge)
 			assert.Fatal(t, ok)
-			_ch.baseChallenge.Status = statusValid
+			_ch.baseChallenge.Status = StatusValid
 			return test{
 				ch:  ch,
 				res: ch,
@@ -849,7 +849,7 @@ func TestDNS01Validate(t *testing.T) {
 			assert.FatalError(t, err)
 			_ch, ok := ch.(*dns01Challenge)
 			assert.Fatal(t, ok)
-			_ch.baseChallenge.Status = statusInvalid
+			_ch.baseChallenge.Status = StatusInvalid
 			return test{
 				ch:  ch,
 				err: MalformedErr(errors.New("challenge already has invalid status")),
@@ -982,7 +982,7 @@ func TestDNS01Validate(t *testing.T) {
 			assert.FatalError(t, err)
 
 			baseClone := ch.clone()
-			baseClone.Status = statusValid
+			baseClone.Status = StatusValid
 			newCh := &dns01Challenge{baseClone}
 
 			return test{
@@ -1002,7 +1002,7 @@ func TestDNS01Validate(t *testing.T) {
 
 						dnsCh, err := unmarshalChallenge(newval)
 						assert.FatalError(t, err)
-						assert.Equals(t, dnsCh.getStatus(), statusValid)
+						assert.Equals(t, dnsCh.getStatus(), StatusValid)
 						assert.True(t, dnsCh.getValidated().Before(time.Now().UTC()))
 						assert.True(t, dnsCh.getValidated().After(time.Now().UTC().Add(-1*time.Second)))
 

@@ -2,6 +2,7 @@ package acme
 
 import (
 	"crypto/x509"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -37,15 +38,19 @@ var (
 )
 
 var (
-	statusValid   = "valid"
-	statusInvalid = "invalid"
-	//statusRevoked     = "revoked"
+	// StatusValid -- valid
+	StatusValid = "valid"
+	// StatusInvalid -- invalid
+	StatusInvalid = "invalid"
+	// StatusPending -- pending; e.g. an Order that is not ready to be finalized.
+	StatusPending = "pending"
+	// StatusDeactivated -- deactivated; e.g. for an Account that is not longer valid.
+	StatusDeactivated = "deactivated"
+	// StatusReady -- ready; e.g. for an Order that is ready to be finalized.
+	StatusReady = "ready"
 	//statusExpired     = "expired"
-	statusPending = "pending"
-	//statusProcessing  = "processing"
-	statusDeactivated = "deactivated"
 	//statusActive      = "active"
-	statusReady = "ready"
+	//statusProcessing  = "processing"
 )
 
 var idLen = 32
@@ -56,4 +61,8 @@ func randID() (val string, err error) {
 		return "", ServerInternalErr(errors.Wrap(err, "error generating random alphanumeric ID"))
 	}
 	return val, nil
+}
+
+func round(a time.Time) time.Time {
+	return a.Round(time.Second)
 }

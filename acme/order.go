@@ -70,13 +70,13 @@ func newOrder(db nosql.DB, ops OrderOptions) (*order, error) {
 		authzs[i] = authz.getID()
 	}
 
-	now := time.Now().UTC().Round(time.Second)
+	now := round(time.Now().UTC())
 	o := &order{
 		ID:             id,
 		AccountID:      ops.AccountID,
 		Created:        now,
-		Status:         statusPending,
-		Expires:        now.Add(defaultOrderExpiry).Round(time.Second),
+		Status:         StatusPending,
+		Expires:        round(now.Add(defaultOrderExpiry)),
 		Identifiers:    ops.Identifiers,
 		NotBefore:      ops.NotBefore,
 		NotAfter:       ops.NotAfter,
@@ -167,30 +167,30 @@ func (o *order) updateStatus(db nosql.DB) (*order, error) {
 
 	now := time.Now().UTC()
 	switch o.Status {
-	case statusInvalid:
+	case StatusInvalid:
 		return o, nil
-	case statusValid:
+	case StatusValid:
 		return o, nil
-	case statusReady:
+	case StatusReady:
 		// check expiry
 		if now.After(o.Expires) {
-			newOrder.Status = statusInvalid
+			newOrder.Status = StatusInvalid
 			newOrder.Error = MalformedErr(errors.New("order has expired"))
 			break
 		}
 		return o, nil
-	case statusPending:
+	case StatusPending:
 		// check expiry
 		if now.After(o.Expires) {
-			newOrder.Status = statusInvalid
+			newOrder.Status = StatusInvalid
 			newOrder.Error = MalformedErr(errors.New("order has expired"))
 			break
 		}
 
 		var count = map[string]int{
-			statusValid:   0,
-			statusInvalid: 0,
-			statusPending: 0,
+			StatusValid:   0,
+			StatusInvalid: 0,
+			StatusPending: 0,
 		}
 		for _, azID := range o.Authorizations {
 			authz, err := getAuthz(db, azID)
@@ -204,12 +204,12 @@ func (o *order) updateStatus(db nosql.DB) (*order, error) {
 			count[st]++
 		}
 		switch {
-		case count[statusInvalid] > 0:
-			newOrder.Status = statusInvalid
-		case count[statusPending] > 0:
+		case count[StatusInvalid] > 0:
+			newOrder.Status = StatusInvalid
+		case count[StatusPending] > 0:
 			break
-		case count[statusValid] == len(o.Authorizations):
-			newOrder.Status = statusReady
+		case count[StatusValid] == len(o.Authorizations):
+			newOrder.Status = StatusReady
 		default:
 			return nil, ServerInternalErr(errors.New("unexpected authz status"))
 		}
@@ -231,13 +231,13 @@ func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAut
 		return nil, err
 	}
 	switch o.Status {
-	case statusInvalid:
+	case StatusInvalid:
 		return nil, OrderNotReadyErr(errors.Errorf("order %s has been abandoned", o.ID))
-	case statusValid:
+	case StatusValid:
 		return o, nil
-	case statusPending:
+	case StatusPending:
 		return nil, OrderNotReadyErr(errors.Errorf("order %s is not ready", o.ID))
-	case statusReady:
+	case StatusReady:
 		break
 	default:
 		return nil, ServerInternalErr(errors.Errorf("unexpected status %s for order %s", o.Status, o.ID))
@@ -283,7 +283,7 @@ func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAut
 	_newOrder := *o
 	newOrder := &_newOrder
 	newOrder.Certificate = cert.ID
-	newOrder.Status = statusValid
+	newOrder.Status = StatusValid
 	if err := newOrder.save(db, o); err != nil {
 		return nil, err
 	}

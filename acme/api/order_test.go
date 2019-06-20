@@ -116,7 +116,7 @@ func TestNewOrderRequestValidate(t *testing.T) {
 			} else {
 				if assert.Nil(t, tc.err) {
 					if tc.nbf.IsZero() {
-						assert.True(t, tc.nor.NotBefore.Before(time.Now()))
+						assert.True(t, tc.nor.NotBefore.Before(time.Now().Add(time.Minute)))
 						assert.True(t, tc.nor.NotBefore.After(time.Now().Add(-time.Minute)))
 					} else {
 						assert.Equals(t, tc.nor.NotBefore, tc.nbf)
@@ -143,10 +143,22 @@ func TestFinalizeRequestValidate(t *testing.T) {
 		err *acme.Error
 	}
 	var tests = map[string]func(t *testing.T) test{
-		"fail/no-identifiers": func(t *testing.T) test {
+		"fail/parse-csr-error": func(t *testing.T) test {
 			return test{
 				fr:  &FinalizeRequest{},
 				err: acme.MalformedErr(errors.Errorf("unable to parse csr: asn1: syntax error: sequence truncated")),
+			}
+		},
+		"fail/invalid-csr-signature": func(t *testing.T) test {
+			b, err := pemutil.Read("../../authority/testdata/certs/badsig.csr")
+			assert.FatalError(t, err)
+			c, ok := b.(*x509.CertificateRequest)
+			assert.Fatal(t, ok)
+			return test{
+				fr: &FinalizeRequest{
+					CSR: base64.RawURLEncoding.EncodeToString(c.Raw),
+				},
+				err: acme.MalformedErr(errors.Errorf("csr failed signature check: x509: ECDSA verification failure")),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -178,9 +190,9 @@ func TestFinalizeRequestValidate(t *testing.T) {
 }
 
 func TestHandlerGetOrder(t *testing.T) {
-	expiry := time.Now().UTC().Add(6 * time.Hour).Round(time.Second)
-	nbf := time.Now().UTC().Round(time.Second)
-	naf := time.Now().UTC().Add(24 * time.Hour).Round(time.Second)
+	expiry := time.Now().UTC().Add(6 * time.Hour)
+	nbf := time.Now().UTC()
+	naf := time.Now().UTC().Add(24 * time.Hour)
 	o := acme.Order{
 		ID:        "orderID",
 		Expires:   expiry.Format(time.RFC3339),
@@ -302,8 +314,8 @@ func TestHandlerGetOrder(t *testing.T) {
 }
 
 func TestHandlerNewOrder(t *testing.T) {
-	expiry := time.Now().UTC().Add(6 * time.Hour).Round(time.Second)
-	nbf := time.Now().UTC().Add(5 * time.Hour).Round(time.Second)
+	expiry := time.Now().UTC().Add(6 * time.Hour)
+	nbf := time.Now().UTC().Add(5 * time.Hour)
 	naf := nbf.Add(17 * time.Hour)
 	o := acme.Order{
 		ID:        "orderID",
@@ -518,8 +530,8 @@ func TestHandlerNewOrder(t *testing.T) {
 }
 
 func TestHandlerFinalizeOrder(t *testing.T) {
-	expiry := time.Now().UTC().Add(6 * time.Hour).Round(time.Second)
-	nbf := time.Now().UTC().Add(5 * time.Hour).Round(time.Second)
+	expiry := time.Now().UTC().Add(6 * time.Hour)
+	nbf := time.Now().UTC().Add(5 * time.Hour)
 	naf := nbf.Add(17 * time.Hour)
 	o := acme.Order{
 		ID:        "orderID",

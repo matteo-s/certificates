@@ -98,9 +98,9 @@ func newBaseChallenge(accountID, authzID string) (*baseChallenge, error) {
 		ID:        id,
 		AccountID: accountID,
 		AuthzID:   authzID,
-		Status:    statusPending,
+		Status:    StatusPending,
 		Token:     token,
-		Created:   time.Now().UTC().Round(time.Second),
+		Created:   round(time.Now().UTC()),
 	}, nil
 }
 
@@ -273,9 +273,9 @@ func newHTTP01Challenge(db nosql.DB, ops ChallengeOptions) (challenge, error) {
 // updated.
 func (hc *http01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validateOptions) (challenge, error) {
 	// If already valid or invalid then return without performing validation.
-	if hc.getStatus() == statusValid {
+	if hc.getStatus() == StatusValid {
 		return hc, nil
-	} else if hc.getStatus() == statusInvalid {
+	} else if hc.getStatus() == StatusInvalid {
 		return nil, MalformedErr(errors.New("challenge already has invalid status"))
 	}
 	url := fmt.Sprintf("http://%s/.well-known/acme-challenge/%s", hc.Value, hc.Token)
@@ -306,8 +306,8 @@ func (hc *http01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo valida
 
 	// Update and store the challenge.
 	upd := &http01Challenge{hc.baseChallenge.clone()}
-	upd.Status = statusValid
-	upd.Validated = time.Now().UTC().Round(time.Second)
+	upd.Status = StatusValid
+	upd.Validated = round(time.Now().UTC())
 
 	if err := upd.save(db, hc); err != nil {
 		return nil, err
@@ -350,9 +350,9 @@ func keyAuthorization(token string, jwk *jose.JSONWebKey) (string, error) {
 // updated.
 func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validateOptions) (challenge, error) {
 	// If already valid or invalid then return without performing validation.
-	if dc.getStatus() == statusValid {
+	if dc.getStatus() == StatusValid {
 		return dc, nil
-	} else if dc.getStatus() == statusInvalid {
+	} else if dc.getStatus() == StatusInvalid {
 		return nil, MalformedErr(errors.New("challenge already has invalid status"))
 	}
 
@@ -382,7 +382,7 @@ func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validat
 
 	// Update and store the challenge.
 	upd := &dns01Challenge{dc.baseChallenge.clone()}
-	upd.Status = statusValid
+	upd.Status = StatusValid
 	upd.Validated = time.Now().UTC()
 
 	if err := upd.save(db, dc); err != nil {

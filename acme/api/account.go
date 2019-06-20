@@ -13,8 +13,8 @@ import (
 
 // NewAccountRequest represents the payload for a new account request.
 type NewAccountRequest struct {
-	Contact            []string
-	OnlyReturnExisting bool
+	Contact            []string `json:"contact"`
+	OnlyReturnExisting bool     `json:"onlyReturnExisting"`
 }
 
 func validateContacts(cs []string) error {
@@ -36,14 +36,14 @@ func (n *NewAccountRequest) Validate() error {
 
 // UpdateAccountRequest represents an update-account request.
 type UpdateAccountRequest struct {
-	Contact []string
-	Status  string
+	Contact []string `json:"contact"`
+	Status  string   `json:"status"`
 }
 
 // IsDeactivateRequest returns true if the update request is a deactivation
 // request, false otherwise.
 func (u *UpdateAccountRequest) IsDeactivateRequest() bool {
-	return u.Contact == nil && u.Status == "deactivated"
+	return u.Status == acme.StatusDeactivated
 }
 
 // Validate validates a update-account request body.
@@ -59,7 +59,7 @@ func (u *UpdateAccountRequest) Validate() error {
 		}
 		return nil
 	case len(u.Status) > 0:
-		if u.Status != "deactivated" {
+		if u.Status != acme.StatusDeactivated {
 			return acme.MalformedErr(errors.Errorf("cannot update account "+
 				"status to %s, only deactivated", u.Status))
 		}

@@ -31,7 +31,7 @@ func (a *Account) GetKey() *jose.JSONWebKey {
 
 // IsValid returns true if the Account is valid.
 func (a *Account) IsValid() bool {
-	return a.Status == statusValid
+	return a.Status == StatusValid
 }
 
 // AccountOptions are the options needed to create a new ACME account.
@@ -62,7 +62,7 @@ func newAccount(db nosql.DB, ops AccountOptions) (*account, error) {
 		Key:     ops.Key,
 		Contact: ops.Contact,
 		Status:  "valid",
-		Created: time.Now().UTC(),
+		Created: round(time.Now().UTC()),
 	}
 	return a, a.saveNew(db)
 }
@@ -145,8 +145,8 @@ func (a *account) update(db nosql.DB, contact []string) (*account, error) {
 // deactivate deactivates the acme account.
 func (a *account) deactivate(db nosql.DB) (*account, error) {
 	b := *a
-	b.Status = statusDeactivated
-	b.Deactivated = time.Now().UTC().Round(time.Second)
+	b.Status = StatusDeactivated
+	b.Deactivated = round(time.Now().UTC())
 	if err := (&b).save(db, a); err != nil {
 		return nil, err
 	}

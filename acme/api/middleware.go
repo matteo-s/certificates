@@ -199,6 +199,7 @@ func (h *Handler) extractJWK(next nextHTTP) nextHTTP {
 		acc, err := h.Auth.GetAccountByKeyID(jwk.KeyID)
 		switch {
 		case nosql.IsErrNotFound(err):
+			// For NewAccount requests ...
 			break
 		case err != nil:
 			api.WriteError(w, err)

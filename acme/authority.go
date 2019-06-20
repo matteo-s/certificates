@@ -151,7 +151,7 @@ func (a *Authority) GetOrdersByAccount(id string) ([]string, error) {
 		if err != nil {
 			return nil, ServerInternalErr(err)
 		}
-		if o.Status == statusInvalid {
+		if o.Status == StatusInvalid {
 			continue
 		}
 		ret = append(ret, a.dir.getLink(OrderLink, true, o.ID))

@@ -66,9 +66,9 @@ func newBaseAuthz(accID string, identifier Identifier) (*baseAuthz, error) {
 	ba := &baseAuthz{
 		ID:         id,
 		AccountID:  accID,
-		Status:     statusPending,
-		Created:    time.Now().UTC().Round(time.Second),
-		Expires:    time.Now().UTC().Add(defaultExpiryDuration).Round(time.Second),
+		Status:     StatusPending,
+		Created:    round(time.Now().UTC()),
+		Expires:    round(time.Now().UTC().Add(defaultExpiryDuration)),
 		Identifier: identifier,
 	}
 
@@ -202,14 +202,14 @@ func (ba *baseAuthz) updateStatus(db nosql.DB) (authz, error) {
 
 	now := time.Now().UTC()
 	switch ba.Status {
-	case statusInvalid:
+	case StatusInvalid:
 		return ba.parent(), nil
-	case statusValid:
+	case StatusValid:
 		return ba.parent(), nil
-	case statusPending:
+	case StatusPending:
 		// check expiry
 		if now.After(ba.Expires) {
-			newAuthz.Status = statusInvalid
+			newAuthz.Status = StatusInvalid
 			newAuthz.Error = MalformedErr(errors.New("authz has expired"))
 			break
 		}
@@ -220,7 +220,7 @@ func (ba *baseAuthz) updateStatus(db nosql.DB) (authz, error) {
 			if err != nil {
 				return ba, err
 			}
-			if ch.getStatus() == statusValid {
+			if ch.getStatus() == StatusValid {
 				isValid = true
 				break
 			}
@@ -229,7 +229,7 @@ func (ba *baseAuthz) updateStatus(db nosql.DB) (authz, error) {
 		if !isValid {
 			return ba.parent(), nil
 		}
-		newAuthz.Status = statusValid
+		newAuthz.Status = StatusValid
 	default:
 		return nil, ServerInternalErr(errors.Errorf("unrecognized authz status: %s", ba.Status))
 	}

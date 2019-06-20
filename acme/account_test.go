@@ -709,7 +709,7 @@ func TestAccountDeactivate(t *testing.T) {
 				if assert.Nil(t, tc.err) {
 					assert.Equals(t, acc.ID, tc.acc.ID)
 					assert.Equals(t, acc.Contact, tc.acc.Contact)
-					assert.Equals(t, acc.Status, statusDeactivated)
+					assert.Equals(t, acc.Status, StatusDeactivated)
 					assert.Equals(t, acc.Key.KeyID, tc.acc.Key.KeyID)
 					assert.Equals(t, acc.Created, tc.acc.Created)
 
@@ -785,7 +785,7 @@ func TestNewAccount(t *testing.T) {
 			} else {
 				if assert.Nil(t, tc.err) {
 					assert.Equals(t, acc.ID, *tc.id)
-					assert.Equals(t, acc.Status, statusValid)
+					assert.Equals(t, acc.Status, StatusValid)
 					assert.Equals(t, acc.Contact, ops.Contact)
 					assert.Equals(t, acc.Key.KeyID, ops.Key.KeyID)
 

@@ -129,7 +129,7 @@ func TestHandlerAddDirLink(t *testing.T) {
 			res.Body.Close()
 			assert.FatalError(t, err)
 
-			assert.Equals(t, res.Header["Link"], []string{fmt.Sprintf("<%s>;\"index\"", tc.link)})
+			assert.Equals(t, res.Header["Link"], []string{fmt.Sprintf("<%s>;rel=\"index\"", tc.link)})
 			assert.Equals(t, bytes.TrimSpace(body), testBody)
 		})
 	}
