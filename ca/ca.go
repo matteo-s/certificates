@@ -109,9 +109,6 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 	// Add regular CA api endpoints in / and /1.0
 	routerHandler := api.New(auth)
 	routerHandler.Route(mux)
-	mux.Route("/", func(r chi.Router) {
-		routerHandler.Route(r)
-	})
 	mux.Route("/1.0", func(r chi.Router) {
 		routerHandler.Route(r)
 	})

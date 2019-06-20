@@ -14,7 +14,7 @@ import (
 )
 
 func link(url, typ string) string {
-	return fmt.Sprintf("<%s>;\"%s\"", url, typ)
+	return fmt.Sprintf("<%s>;rel=\"%s\"", url, typ)
 }
 
 type contextKey string
@@ -182,21 +182,22 @@ func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, acme.ServerInternalErr(errors.Errorf("payload expected in request context")))
 		return
 	}
-	if !(payload.isPostAsGet || payload.isEmptyJSON) {
-		api.WriteError(w, acme.MalformedErr(errors.Errorf("payload must be either post-as-get or empty JSON blob")))
-		return
-	}
 
-	// If empty JSON payload then attempt to validate the challenge.
+	// NOTE: We should be checking that the request is either a POST-as-GET, or
+	// that the payload is an empty JSON block ({}). However, older ACME clients
+	// still send a vestigial body (rather than an empty JSON block) and
+	// strict enforcement would render these clients broken. For the time being
+	// we'll just ignore the body.
+
 	var (
 		err  error
 		ch   *acme.Challenge
 		chID = chi.URLParam(r, "chID")
 	)
-	if payload.isEmptyJSON {
-		ch, err = h.Auth.ValidateChallenge(acc.GetID(), chID, acc.GetKey())
-	} else {
+	if payload.isPostAsGet {
 		ch, err = h.Auth.GetChallenge(acc.GetID(), chID)
+	} else {
+		ch, err = h.Auth.ValidateChallenge(acc.GetID(), chID, acc.GetKey())
 	}
 	if err != nil {
 		api.WriteError(w, err)

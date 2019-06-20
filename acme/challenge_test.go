@@ -198,6 +198,8 @@ func TestChallengeToACME(t *testing.T) {
 			assert.Equals(t, ach.Status, ch.getStatus())
 			assert.Equals(t, ach.Token, ch.getToken())
 			assert.Equals(t, ach.URL, "https://ca.smallstep.com/acme/challenge/"+ch.getID())
+			assert.Equals(t, ach.ID, ch.getID())
+			assert.Equals(t, ach.AuthzID, ch.getAuthzID())
 
 			if ach.Type == "http-01" {
 				v, err := time.Parse(time.RFC3339, ach.Validated)

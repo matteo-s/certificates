@@ -153,11 +153,12 @@ func (bc *baseChallenge) getCreated() time.Time {
 // type for presentation in the ACME protocol.
 func (bc *baseChallenge) toACME(db nosql.DB, dir *directory) (*Challenge, error) {
 	ac := &Challenge{
-		Type:   bc.getType(),
-		Status: bc.getStatus(),
-		Token:  bc.getToken(),
-		URL:    dir.getLink(ChallengeLink, true, bc.getID()),
-		ID:     bc.getID(),
+		Type:    bc.getType(),
+		Status:  bc.getStatus(),
+		Token:   bc.getToken(),
+		URL:     dir.getLink(ChallengeLink, true, bc.getID()),
+		ID:      bc.getID(),
+		AuthzID: bc.getAuthzID(),
 	}
 	if !bc.Validated.IsZero() {
 		ac.Validated = bc.Validated.Format(time.RFC3339)
