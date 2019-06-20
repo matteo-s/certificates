@@ -358,12 +358,15 @@ func TestHandlerGetAuthz(t *testing.T) {
 			assert.FatalError(t, err)
 
 			if res.StatusCode >= 400 && assert.NotNil(t, tc.problem) {
-				b, err := json.Marshal(tc.problem)
-				assert.FatalError(t, err)
-				//var problem *acme.Error
-				//assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &problem))
+				var ae acme.AError
+				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &ae))
+				prob := tc.problem.ToACME()
+
+				assert.Equals(t, ae.Type, prob.Type)
+				assert.Equals(t, ae.Detail, prob.Detail)
+				assert.Equals(t, ae.Identifier, prob.Identifier)
+				assert.Equals(t, ae.Subproblems, prob.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
-				assert.Equals(t, bytes.TrimSpace(body), b)
 			} else {
 				//var gotAz acme.Authz
 				//assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &gotAz))
@@ -473,12 +476,15 @@ func TestHandlerGetCertificate(t *testing.T) {
 			assert.FatalError(t, err)
 
 			if res.StatusCode >= 400 && assert.NotNil(t, tc.problem) {
-				b, err := json.Marshal(tc.problem)
-				assert.FatalError(t, err)
-				//var problem *acme.Error
-				//assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &problem))
+				var ae acme.AError
+				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &ae))
+				prob := tc.problem.ToACME()
+
+				assert.Equals(t, ae.Type, prob.Type)
+				assert.Equals(t, ae.Detail, prob.Detail)
+				assert.Equals(t, ae.Identifier, prob.Identifier)
+				assert.Equals(t, ae.Subproblems, prob.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
-				assert.Equals(t, bytes.TrimSpace(body), b)
 			} else {
 				//var gotAz acme.Authz
 				//assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &gotAz))
@@ -682,10 +688,15 @@ func TestHandlerGetChallenge(t *testing.T) {
 			assert.FatalError(t, err)
 
 			if res.StatusCode >= 400 && assert.NotNil(t, tc.problem) {
-				b, err := json.Marshal(tc.problem)
-				assert.FatalError(t, err)
+				var ae acme.AError
+				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &ae))
+				prob := tc.problem.ToACME()
+
+				assert.Equals(t, ae.Type, prob.Type)
+				assert.Equals(t, ae.Detail, prob.Detail)
+				assert.Equals(t, ae.Identifier, prob.Identifier)
+				assert.Equals(t, ae.Subproblems, prob.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
-				assert.Equals(t, bytes.TrimSpace(body), b)
 			} else {
 				expB, err := json.Marshal(tc.ch)
 				assert.FatalError(t, err)

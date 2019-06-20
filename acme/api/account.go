@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/logging"
 )
 
 // NewAccountRequest represents the payload for a new account request.
@@ -68,6 +69,17 @@ func (u *UpdateAccountRequest) Validate() error {
 	}
 }
 
+func logAccount(w http.ResponseWriter, acc *acme.Account) {
+	if rl, ok := w.(logging.ResponseLogger); ok {
+		m := map[string]interface{}{
+			"accContact": acc.Contact,
+			"accStatus":  acc.Status,
+			"accOrders":  acc.Orders,
+		}
+		rl.WithFields(m)
+	}
+}
+
 // NewAccount is the handler resource for creating new ACME accounts.
 func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 	payload, ok := payloadFromContext(r)
@@ -116,6 +128,7 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Location", h.Auth.GetLink(acme.AccountLink, true, acc.GetID()))
 	w.WriteHeader(httpStatus)
 	api.JSON(w, acc)
+	logAccount(w, acc)
 	return
 }
 
@@ -156,7 +169,17 @@ func (h *Handler) GetUpdateAccount(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Location", h.Auth.GetLink(acme.AccountLink, true, acc.GetID()))
 	w.WriteHeader(http.StatusOK)
 	api.JSON(w, acc)
+	logAccount(w, acc)
 	return
+}
+
+func logOrdersByAccount(w http.ResponseWriter, oids []string) {
+	if rl, ok := w.(logging.ResponseLogger); ok {
+		m := map[string]interface{}{
+			"accOrders": oids,
+		}
+		rl.WithFields(m)
+	}
 }
 
 // GetOrdersByAccount ACME api for retrieving the list of order urls belonging to an account.
@@ -179,5 +202,6 @@ func (h *Handler) GetOrdersByAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	api.JSON(w, orders)
+	logOrdersByAccount(w, orders)
 	return
 }

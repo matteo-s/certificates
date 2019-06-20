@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/cli/jose"
 )
 
@@ -62,7 +64,9 @@ func (h *Handler) Route(r api.Router) {
 	getLink := h.Auth.GetLink
 	// Standard ACME API
 	r.MethodFunc("GET", getLink(acme.NewNonceLink, false), h.addNonce(h.GetNonce))
+	r.MethodFunc("HEAD", getLink(acme.NewNonceLink, false), h.addNonce(h.GetNonce))
 	r.MethodFunc("GET", getLink(acme.DirectoryLink, false), h.addNonce(h.GetDirectory))
+	r.MethodFunc("HEAD", getLink(acme.DirectoryLink, false), h.addNonce(h.GetDirectory))
 
 	extractPayloadByJWK := func(next nextHTTP) nextHTTP {
 		return h.addNonce(h.addDirLink(h.verifyContentType(h.parseJWS(h.validateJWS(h.extractJWK(h.verifyAndExtractJWSPayload(next)))))))
@@ -93,11 +97,42 @@ func (h *Handler) GetNonce(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-// GetDirectory is the ACME resource for returning an directory configuration
+func logDirectory(w http.ResponseWriter, dir *acme.Directory) {
+	if rl, ok := w.(logging.ResponseLogger); ok {
+		m := map[string]interface{}{
+			"keyChange":  dir.KeyChange,
+			"newAccount": dir.NewAccount,
+			"newAuthz":   dir.NewAuthz,
+			"newNonce":   dir.NewNonce,
+			"newOrder":   dir.NewOrder,
+			"revokeCert": dir.RevokeCert,
+		}
+		rl.WithFields(m)
+	}
+}
+
+// GetDirectory is the ACME resource for returning a directory configuration
 // for client configuration.
 func (h *Handler) GetDirectory(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	api.JSON(w, h.Auth.GetDirectory())
+	dir := h.Auth.GetDirectory()
+	api.JSON(w, dir)
+	logDirectory(w, dir)
+	return
+}
+
+func logAuthz(w http.ResponseWriter, az *acme.Authz) {
+	chs, _ := json.Marshal(az.Challenges)
+	if rl, ok := w.(logging.ResponseLogger); ok {
+		m := map[string]interface{}{
+			"azIdentifier": az.Identifier,
+			"azStatus":     az.Status,
+			"azExpires":    az.Expires,
+			"azChallenges": string(chs),
+			"azWildcard":   az.Wildcard,
+		}
+		rl.WithFields(m)
+	}
 }
 
 // GetAuthz ACME api for retrieving an Authz.
@@ -117,7 +152,22 @@ func (h *Handler) GetAuthz(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Location", h.Auth.GetLink(acme.AuthzLink, true, authz.GetID()))
 	w.WriteHeader(http.StatusOK)
 	api.JSON(w, authz)
+	logAuthz(w, authz)
 	return
+}
+
+func logChallenge(w http.ResponseWriter, ch *acme.Challenge) {
+	if rl, ok := w.(logging.ResponseLogger); ok {
+		m := map[string]interface{}{
+			"chType":      ch.Type,
+			"chStatus":    ch.Status,
+			"chToken":     ch.Token,
+			"chValidated": ch.Validated,
+			"chURL":       ch.URL,
+			"chError":     ch.Error,
+		}
+		rl.WithFields(m)
+	}
 }
 
 // GetChallenge ACME api for retrieving a Challenge.
@@ -158,6 +208,7 @@ func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Location", getLink(acme.ChallengeLink, true, ch.GetID()))
 	w.WriteHeader(http.StatusOK)
 	api.JSON(w, ch)
+	logChallenge(w, ch)
 	return
 }
 

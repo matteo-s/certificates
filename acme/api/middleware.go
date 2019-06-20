@@ -2,7 +2,8 @@ package api
 
 import (
 	"context"
-	"fmt"
+	"crypto"
+	"encoding/base64"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -11,11 +12,21 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/cli/jose"
 	"github.com/smallstep/nosql"
 )
 
 type nextHTTP = func(http.ResponseWriter, *http.Request)
+
+func logNonce(w http.ResponseWriter, nonce string) {
+	if rl, ok := w.(logging.ResponseLogger); ok {
+		m := map[string]interface{}{
+			"nonce": nonce,
+		}
+		rl.WithFields(m)
+	}
+}
 
 // addNonce is a middleware that adds a nonce to the response header.
 func (h *Handler) addNonce(next nextHTTP) nextHTTP {
@@ -27,6 +38,7 @@ func (h *Handler) addNonce(next nextHTTP) nextHTTP {
 		}
 		w.Header().Set("Replay-Nonce", nonce)
 		w.Header().Set("Cache-Control", "no-store")
+		logNonce(w, nonce)
 		next(w, r)
 		return
 	}
@@ -176,6 +188,14 @@ func (h *Handler) extractJWK(next nextHTTP) nextHTTP {
 		}
 		ctx = context.WithValue(ctx, jwkContextKey, jwk)
 
+		if len(jwk.KeyID) == 0 {
+			kid, err := jwk.Thumbprint(crypto.SHA256)
+			if err != nil {
+				api.WriteError(w, acme.ServerInternalErr(errors.Wrap(err, "error generating jwk thumbprint")))
+				return
+			}
+			jwk.KeyID = base64.RawURLEncoding.EncodeToString(kid)
+		}
 		acc, err := h.Auth.GetAccountByKeyID(jwk.KeyID)
 		switch {
 		case nosql.IsErrNotFound(err):
@@ -251,8 +271,7 @@ func (h *Handler) verifyAndExtractJWSPayload(next nextHTTP) nextHTTP {
 			api.WriteError(w, acme.ServerInternalErr(errors.Errorf("jwk expected in request context")))
 			return
 		}
-		fmt.Printf("jws.Signatures[0].Protected.Algorithm = %+v\n", jws.Signatures[0].Protected.Algorithm)
-		if jwk.Algorithm != jws.Signatures[0].Protected.Algorithm {
+		if len(jwk.Algorithm) != 0 && jwk.Algorithm != jws.Signatures[0].Protected.Algorithm {
 			api.WriteError(w, acme.MalformedErr(errors.New("verifier and signature algorithm do not match")))
 			return
 		}
@@ -264,7 +283,7 @@ func (h *Handler) verifyAndExtractJWSPayload(next nextHTTP) nextHTTP {
 		ctx := context.WithValue(r.Context(), payloadContextKey, &payloadInfo{
 			value:       payload,
 			isPostAsGet: string(payload) == "",
-			isEmptyJSON: string(payload) == "{}\n",
+			isEmptyJSON: string(payload) == "{}",
 		})
 		next(w, r.WithContext(ctx))
 		return

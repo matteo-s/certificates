@@ -587,11 +587,11 @@ func TestOrderUpdateStatus(t *testing.T) {
 		"fail/unexpected-status": func(t *testing.T) test {
 			o, err := newO()
 			assert.FatalError(t, err)
-			o.Status = statusRevoked
+			o.Status = statusDeactivated
 			return test{
 				o:   o,
 				res: o,
-				err: ServerInternalErr(errors.New("unrecognized order status: revoked")),
+				err: ServerInternalErr(errors.New("unrecognized order status: deactivated")),
 			}
 		},
 		"fail/save-error": func(t *testing.T) test {

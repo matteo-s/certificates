@@ -130,15 +130,23 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 		prefix := config.ACME.Prefix
 		acmeAuth := acme.NewAuthority(auth.GetDatabase().(nosql.DB), dns, prefix, auth)
 		acmeRouterHandler := acmeAPI.New(acmeAuth)
-		acmeRouterHandler.Route(mux)
 		mux.Route("/"+prefix, func(r chi.Router) {
-			routerHandler.Route(r)
+			acmeRouterHandler.Route(r)
 		})
 		mux.Route("/1.0/"+prefix, func(r chi.Router) {
-			routerHandler.Route(r)
+			acmeRouterHandler.Route(r)
 		})
-
 	}
+	/*
+		// helpful routine for logging all routes //
+		walkFunc := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+			fmt.Printf("%s %s\n", method, route)
+			return nil
+		}
+		if err := chi.Walk(mux, walkFunc); err != nil {
+			fmt.Printf("Logging err: %s\n", err.Error())
+		}
+	*/
 	// Add monitoring if configured
 	if len(config.Monitoring) > 0 {
 		m, err := monitoring.New(config.Monitoring)

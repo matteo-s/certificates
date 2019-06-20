@@ -1,8 +1,6 @@
 package acme
 
 import (
-	"encoding/json"
-
 	"github.com/pkg/errors"
 )
 
@@ -400,10 +398,25 @@ func (e *Error) Cause() error {
 	return e.Err
 }
 
-// MarshalJSON converts the internal Error type into the public acme problem
-// type for presentation in the ACME protocol.
-func (e *Error) MarshalJSON() ([]byte, error) {
-	return json.Marshal(e.toACME())
+// ToACME returns an acme representation of the problem type.
+func (e *Error) ToACME() *AError {
+	ae := &AError{
+		Type:   "urn:ietf:params:acme:error:" + e.Type.String(),
+		Detail: e.Error(),
+		Status: e.Status,
+	}
+	if e.Identifier != nil {
+		ae.Identifier = *e.Identifier
+	}
+	for _, p := range e.Sub {
+		ae.Subproblems = append(ae.Subproblems, p.ToACME())
+	}
+	return ae
+}
+
+// StatusCode returns the status code and implements the StatusCode interface.
+func (e *Error) StatusCode() int {
+	return e.Status
 }
 
 // AError is the error type as seen in acme request/responses.
@@ -412,24 +425,15 @@ type AError struct {
 	Detail      string        `json:"detail"`
 	Identifier  interface{}   `json:"identifier,omitempty"`
 	Subproblems []interface{} `json:"subproblems,omitempty"`
+	Status      int           `json:"-"`
 }
 
-// toACME returns an acme representation of the problem type.
-func (e *Error) toACME() *AError {
-	ae := &AError{
-		Type:   "urn:ietf:params:acme:error:" + e.Type.String(),
-		Detail: e.Error(),
-	}
-	if e.Identifier != nil {
-		ae.Identifier = *e.Identifier
-	}
-	for _, p := range e.Sub {
-		ae.Subproblems = append(ae.Subproblems, p.toACME())
-	}
-	return ae
+// Error allows AError to implement the error interface.
+func (ae *AError) Error() string {
+	return ae.Detail
 }
 
 // StatusCode returns the status code and implements the StatusCode interface.
-func (e *Error) StatusCode() int {
-	return e.Status
+func (ae *AError) StatusCode() int {
+	return ae.Status
 }

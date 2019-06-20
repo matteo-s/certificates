@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/logging"
 )
 
 // NewOrderRequest represents the body for a NewOrder request.
@@ -68,6 +69,23 @@ func (f *FinalizeRequest) Validate() error {
 	return nil
 }
 
+func logOrder(w http.ResponseWriter, o *acme.Order) {
+	if rl, ok := w.(logging.ResponseLogger); ok {
+		m := map[string]interface{}{
+			"ordStatus":         o.Status,
+			"ordExpires":        o.Expires,
+			"ordIdentifiers":    o.Identifiers,
+			"ordNotBefore":      o.NotBefore,
+			"ordNotAfter":       o.NotAfter,
+			"ordError":          o.Error,
+			"ordAuthorizations": o.Authorizations,
+			"ordFinalize":       o.Finalize,
+			"ordCertificate":    o.Certificate,
+		}
+		rl.WithFields(m)
+	}
+}
+
 // NewOrder ACME api for creating a new order.
 func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 	acc, ok := accountFromContext(r)
@@ -92,7 +110,7 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	order, err := h.Auth.NewOrder(acme.OrderOptions{
+	o, err := h.Auth.NewOrder(acme.OrderOptions{
 		AccountID:   acc.GetID(),
 		Identifiers: nor.Identifiers,
 		NotBefore:   nor.NotBefore,
@@ -103,9 +121,10 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Location", h.Auth.GetLink(acme.OrderLink, true, order.GetID()))
+	w.Header().Set("Location", h.Auth.GetLink(acme.OrderLink, true, o.GetID()))
 	w.WriteHeader(http.StatusCreated)
-	api.JSON(w, order)
+	api.JSON(w, o)
+	logOrder(w, o)
 	return
 }
 
@@ -117,15 +136,16 @@ func (h *Handler) GetOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	oid := chi.URLParam(r, "ordID")
-	order, err := h.Auth.GetOrder(acc.GetID(), oid)
+	o, err := h.Auth.GetOrder(acc.GetID(), oid)
 	if err != nil {
 		api.WriteError(w, err)
 		return
 	}
 
-	w.Header().Set("Location", h.Auth.GetLink(acme.OrderLink, true, order.GetID()))
+	w.Header().Set("Location", h.Auth.GetLink(acme.OrderLink, true, o.GetID()))
 	w.WriteHeader(http.StatusOK)
-	api.JSON(w, order)
+	api.JSON(w, o)
+	logOrder(w, o)
 	return
 }
 
@@ -161,5 +181,6 @@ func (h *Handler) FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Location", h.Auth.GetLink(acme.OrderLink, true, o.ID))
 	w.WriteHeader(http.StatusOK)
 	api.JSON(w, o)
+	logOrder(w, o)
 	return
 }

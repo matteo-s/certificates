@@ -18,14 +18,14 @@ import (
 // Challenge is a subset of the challenge type containing only those attributes
 // required for responses in the ACME protocol.
 type Challenge struct {
-	Type      string      `json:"type"`
-	Status    string      `json:"status"`
-	Token     string      `json:"token"`
-	Validated string      `json:"validated,omitempty"`
-	URL       string      `json:"url"`
-	Error     interface{} `json:"error,omitempty"`
-	ID        string      `json:"-"`
-	AuthzID   string      `json:"-"`
+	Type      string  `json:"type"`
+	Status    string  `json:"status"`
+	Token     string  `json:"token"`
+	Validated string  `json:"validated,omitempty"`
+	URL       string  `json:"url"`
+	Error     *AError `json:"error,omitempty"`
+	ID        string  `json:"-"`
+	AuthzID   string  `json:"-"`
 }
 
 // GetID returns the Challenge ID.
@@ -81,7 +81,7 @@ type baseChallenge struct {
 	Value     string    `json:"value"`
 	Validated time.Time `json:"validated"`
 	Created   time.Time `json:"created"`
-	Error     *Error    `json:"error"`
+	Error     *AError   `json:"error"`
 }
 
 func newBaseChallenge(accountID, authzID string) (*baseChallenge, error) {
@@ -163,7 +163,7 @@ func (bc *baseChallenge) toACME(db nosql.DB, dir *directory) (*Challenge, error)
 		ac.Validated = bc.Validated.Format(time.RFC3339)
 	}
 	if bc.Error != nil {
-		ac.Error = bc.Error.toACME()
+		ac.Error = bc.Error
 	}
 	return ac, nil
 }
@@ -212,7 +212,7 @@ func (bc *baseChallenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validate
 
 func (bc *baseChallenge) storeAndReturnError(db nosql.DB, err *Error) error {
 	clone := bc.clone()
-	clone.Error = err
+	clone.Error = err.ToACME()
 	clone.save(db, bc)
 	return err
 }

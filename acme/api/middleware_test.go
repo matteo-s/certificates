@@ -3,6 +3,8 @@ package api
 import (
 	"bytes"
 	"context"
+	"crypto"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -73,10 +75,15 @@ func TestHandlerAddNonce(t *testing.T) {
 			assert.FatalError(t, err)
 
 			if res.StatusCode >= 400 && assert.NotNil(t, tc.problem) {
-				b, err := json.Marshal(tc.problem)
-				assert.FatalError(t, err)
+				var ae acme.AError
+				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &ae))
+				prob := tc.problem.ToACME()
+
+				assert.Equals(t, ae.Type, prob.Type)
+				assert.Equals(t, ae.Detail, prob.Detail)
+				assert.Equals(t, ae.Identifier, prob.Identifier)
+				assert.Equals(t, ae.Subproblems, prob.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
-				assert.Equals(t, bytes.TrimSpace(body), b)
 			} else {
 				assert.Equals(t, res.Header["Replay-Nonce"], []string{"bar"})
 				assert.Equals(t, res.Header["Cache-Control"], []string{"no-store"})
@@ -167,10 +174,15 @@ func TestHandlerVerifyContentType(t *testing.T) {
 			assert.FatalError(t, err)
 
 			if res.StatusCode >= 400 && assert.NotNil(t, tc.problem) {
-				b, err := json.Marshal(tc.problem)
-				assert.FatalError(t, err)
+				var ae acme.AError
+				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &ae))
+				prob := tc.problem.ToACME()
+
+				assert.Equals(t, ae.Type, prob.Type)
+				assert.Equals(t, ae.Detail, prob.Detail)
+				assert.Equals(t, ae.Identifier, prob.Identifier)
+				assert.Equals(t, ae.Subproblems, prob.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
-				assert.Equals(t, bytes.TrimSpace(body), b)
 			} else {
 				assert.Equals(t, bytes.TrimSpace(body), testBody)
 			}
@@ -231,10 +243,15 @@ func TestHandlerIsPostAsGet(t *testing.T) {
 			assert.FatalError(t, err)
 
 			if res.StatusCode >= 400 && assert.NotNil(t, tc.problem) {
-				b, err := json.Marshal(tc.problem)
-				assert.FatalError(t, err)
+				var ae acme.AError
+				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &ae))
+				prob := tc.problem.ToACME()
+
+				assert.Equals(t, ae.Type, prob.Type)
+				assert.Equals(t, ae.Detail, prob.Detail)
+				assert.Equals(t, ae.Identifier, prob.Identifier)
+				assert.Equals(t, ae.Subproblems, prob.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
-				assert.Equals(t, bytes.TrimSpace(body), b)
 			} else {
 				assert.Equals(t, bytes.TrimSpace(body), testBody)
 			}
@@ -318,10 +335,15 @@ func TestHandlerParseJWS(t *testing.T) {
 			assert.FatalError(t, err)
 
 			if res.StatusCode >= 400 && assert.NotNil(t, tc.problem) {
-				b, err := json.Marshal(tc.problem)
-				assert.FatalError(t, err)
+				var ae acme.AError
+				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &ae))
+				prob := tc.problem.ToACME()
+
+				assert.Equals(t, ae.Type, prob.Type)
+				assert.Equals(t, ae.Detail, prob.Detail)
+				assert.Equals(t, ae.Identifier, prob.Identifier)
+				assert.Equals(t, ae.Subproblems, prob.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
-				assert.Equals(t, bytes.TrimSpace(body), b)
 			} else {
 				assert.Equals(t, bytes.TrimSpace(body), testBody)
 			}
@@ -426,6 +448,27 @@ func TestHandlerVerifyAndExtractJWSPayload(t *testing.T) {
 				},
 			}
 		},
+		"ok/empty-algorithm-in-jwk": func(t *testing.T) test {
+			_pub := *pub
+			clone := &_pub
+			clone.Algorithm = ""
+			ctx := context.WithValue(context.Background(), jwsContextKey, parsedJWS)
+			ctx = context.WithValue(ctx, jwkContextKey, pub)
+			return test{
+				ctx:        ctx,
+				statusCode: 200,
+				next: func(w http.ResponseWriter, r *http.Request) {
+					p, ok := payloadFromContext(r)
+					assert.Fatal(t, ok)
+					if assert.NotNil(t, p) {
+						assert.Equals(t, p.value, []byte("baz"))
+						assert.False(t, p.isPostAsGet)
+						assert.False(t, p.isEmptyJSON)
+					}
+					w.Write(testBody)
+				},
+			}
+		},
 		"ok/post-as-get": func(t *testing.T) test {
 			_jws, err := signer.Sign([]byte(""))
 			assert.FatalError(t, err)
@@ -468,7 +511,7 @@ func TestHandlerVerifyAndExtractJWSPayload(t *testing.T) {
 					if assert.NotNil(t, p) {
 						assert.Equals(t, p.value, []byte("{}"))
 						assert.False(t, p.isPostAsGet)
-						assert.False(t, p.isEmptyJSON)
+						assert.True(t, p.isEmptyJSON)
 					}
 					w.Write(testBody)
 				},
@@ -492,10 +535,15 @@ func TestHandlerVerifyAndExtractJWSPayload(t *testing.T) {
 			assert.FatalError(t, err)
 
 			if res.StatusCode >= 400 && assert.NotNil(t, tc.problem) {
-				b, err := json.Marshal(tc.problem)
-				assert.FatalError(t, err)
+				var ae acme.AError
+				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &ae))
+				prob := tc.problem.ToACME()
+
+				assert.Equals(t, ae.Type, prob.Type)
+				assert.Equals(t, ae.Detail, prob.Detail)
+				assert.Equals(t, ae.Identifier, prob.Identifier)
+				assert.Equals(t, ae.Subproblems, prob.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
-				assert.Equals(t, bytes.TrimSpace(body), b)
 			} else {
 				assert.Equals(t, bytes.TrimSpace(body), testBody)
 			}
@@ -699,10 +747,15 @@ func TestHandlerLookupJWK(t *testing.T) {
 			assert.FatalError(t, err)
 
 			if res.StatusCode >= 400 && assert.NotNil(t, tc.problem) {
-				b, err := json.Marshal(tc.problem)
-				assert.FatalError(t, err)
+				var ae acme.AError
+				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &ae))
+				prob := tc.problem.ToACME()
+
+				assert.Equals(t, ae.Type, prob.Type)
+				assert.Equals(t, ae.Detail, prob.Detail)
+				assert.Equals(t, ae.Identifier, prob.Identifier)
+				assert.Equals(t, ae.Subproblems, prob.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
-				assert.Equals(t, bytes.TrimSpace(body), b)
 			} else {
 				assert.Equals(t, bytes.TrimSpace(body), testBody)
 			}
@@ -713,7 +766,11 @@ func TestHandlerLookupJWK(t *testing.T) {
 func TestHandlerExtractJWK(t *testing.T) {
 	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 	assert.FatalError(t, err)
+	kid, err := jwk.Thumbprint(crypto.SHA256)
+	assert.FatalError(t, err)
 	pub := jwk.Public()
+	pub.KeyID = base64.RawURLEncoding.EncodeToString(kid)
+
 	so := new(jose.SignerOptions)
 	so.WithHeader("jwk", pub)
 	signer, err := jose.NewSigner(jose.SigningKey{
@@ -751,22 +808,38 @@ func TestHandlerExtractJWK(t *testing.T) {
 			}
 		},
 		"fail/nil-jwk": func(t *testing.T) test {
-			_signer, err := jose.NewSigner(jose.SigningKey{
-				Algorithm: jose.SignatureAlgorithm(jwk.Algorithm),
-				Key:       jwk.Key,
-			}, new(jose.SignerOptions))
-			assert.FatalError(t, err)
-			_jws, err := _signer.Sign([]byte("baz"))
-			assert.FatalError(t, err)
-			_raw, err := _jws.CompactSerialize()
-			assert.FatalError(t, err)
-			_parsedJWS, err := jose.ParseJWS(_raw)
-			assert.FatalError(t, err)
+			_jws := &jose.JSONWebSignature{
+				Signatures: []actualjose.Signature{
+					{
+						Protected: actualjose.Header{
+							JSONWebKey: nil,
+						},
+					},
+				},
+			}
 
 			return test{
-				ctx:        context.WithValue(context.Background(), jwsContextKey, _parsedJWS),
+				ctx:        context.WithValue(context.Background(), jwsContextKey, _jws),
 				statusCode: 400,
 				problem:    acme.MalformedErr(errors.New("jwk expected in protected header")),
+			}
+		},
+		"fail/thumbprint-error": func(t *testing.T) test {
+			_jws := &jose.JSONWebSignature{
+				Signatures: []actualjose.Signature{
+					{
+						Protected: actualjose.Header{
+							JSONWebKey: &jose.JSONWebKey{Key: "foo"},
+						},
+					},
+				},
+			}
+
+			ctx := context.WithValue(context.Background(), jwsContextKey, _jws)
+			return test{
+				ctx:        ctx,
+				statusCode: 500,
+				problem:    acme.ServerInternalErr(errors.New("error generating jwk thumbprint: square/go-jose: unknown key type 'string'")),
 			}
 		},
 		"fail/GetAccountByKeyID-error": func(t *testing.T) test {
@@ -774,7 +847,7 @@ func TestHandlerExtractJWK(t *testing.T) {
 				ctx: context.WithValue(context.Background(), jwsContextKey, parsedJWS),
 				auth: &mockAcmeAuthority{
 					getAccountByKeyID: func(kid string) (*acme.Account, error) {
-						assert.Equals(t, kid, jwk.KeyID)
+						assert.Equals(t, kid, pub.KeyID)
 						return nil, acme.ServerInternalErr(errors.New("force"))
 					},
 				},
@@ -788,7 +861,7 @@ func TestHandlerExtractJWK(t *testing.T) {
 				ctx: context.WithValue(context.Background(), jwsContextKey, parsedJWS),
 				auth: &mockAcmeAuthority{
 					getAccountByKeyID: func(kid string) (*acme.Account, error) {
-						assert.Equals(t, kid, jwk.KeyID)
+						assert.Equals(t, kid, pub.KeyID)
 						return acc, nil
 					},
 				},
@@ -802,7 +875,7 @@ func TestHandlerExtractJWK(t *testing.T) {
 				ctx: context.WithValue(context.Background(), jwsContextKey, parsedJWS),
 				auth: &mockAcmeAuthority{
 					getAccountByKeyID: func(kid string) (*acme.Account, error) {
-						assert.Equals(t, kid, jwk.KeyID)
+						assert.Equals(t, kid, pub.KeyID)
 						return acc, nil
 					},
 				},
@@ -824,7 +897,7 @@ func TestHandlerExtractJWK(t *testing.T) {
 				ctx: context.WithValue(context.Background(), jwsContextKey, parsedJWS),
 				auth: &mockAcmeAuthority{
 					getAccountByKeyID: func(kid string) (*acme.Account, error) {
-						assert.Equals(t, kid, jwk.KeyID)
+						assert.Equals(t, kid, pub.KeyID)
 						return nil, database.ErrNotFound
 					},
 				},
@@ -859,10 +932,15 @@ func TestHandlerExtractJWK(t *testing.T) {
 			assert.FatalError(t, err)
 
 			if res.StatusCode >= 400 && assert.NotNil(t, tc.problem) {
-				b, err := json.Marshal(tc.problem)
-				assert.FatalError(t, err)
+				var ae acme.AError
+				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &ae))
+				prob := tc.problem.ToACME()
+
+				assert.Equals(t, ae.Type, prob.Type)
+				assert.Equals(t, ae.Detail, prob.Detail)
+				assert.Equals(t, ae.Identifier, prob.Identifier)
+				assert.Equals(t, ae.Subproblems, prob.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
-				assert.Equals(t, bytes.TrimSpace(body), b)
 			} else {
 				assert.Equals(t, bytes.TrimSpace(body), testBody)
 			}
@@ -1107,10 +1185,15 @@ func TestHandlerValidateJWS(t *testing.T) {
 			assert.FatalError(t, err)
 
 			if res.StatusCode >= 400 && assert.NotNil(t, tc.problem) {
-				b, err := json.Marshal(tc.problem)
-				assert.FatalError(t, err)
+				var ae acme.AError
+				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &ae))
+				prob := tc.problem.ToACME()
+
+				assert.Equals(t, ae.Type, prob.Type)
+				assert.Equals(t, ae.Detail, prob.Detail)
+				assert.Equals(t, ae.Identifier, prob.Identifier)
+				assert.Equals(t, ae.Subproblems, prob.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
-				assert.Equals(t, bytes.TrimSpace(body), b)
 			} else {
 				assert.Equals(t, bytes.TrimSpace(body), testBody)
 			}

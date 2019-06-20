@@ -373,6 +373,19 @@ func TestChallengeUnmarshal(t *testing.T) {
 				chb: b,
 			}
 		},
+		"ok/err": func(t *testing.T) test {
+			httpCh, err := newHTTPCh()
+			assert.FatalError(t, err)
+			_httpCh, ok := httpCh.(*http01Challenge)
+			assert.Fatal(t, ok)
+			_httpCh.baseChallenge.Error = ServerInternalErr(errors.New("force")).ToACME()
+			b, err := json.Marshal(httpCh)
+			assert.FatalError(t, err)
+			return test{
+				ch:  httpCh,
+				chb: b,
+			}
+		},
 	}
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -602,7 +615,7 @@ func TestHTTP01Validate(t *testing.T) {
 			expErr := ConnectionErr(errors.Errorf("error doing http GET for url "+
 				"http://acme.example.com/.well-known/acme-challenge/%s: force", ch.getToken()))
 			baseClone := ch.clone()
-			baseClone.Error = expErr
+			baseClone.Error = expErr.ToACME()
 			newCh := &http01Challenge{baseClone}
 			newb, err := json.Marshal(newCh)
 			assert.FatalError(t, err)
@@ -681,7 +694,7 @@ func TestHTTP01Validate(t *testing.T) {
 			expErr := RejectedIdentifierErr(errors.Errorf("keyAuthorization does not match; "+
 				"expected %s, but got foo", expKeyAuth))
 			baseClone := ch.clone()
-			baseClone.Error = expErr
+			baseClone.Error = expErr.ToACME()
 			newCh := &http01Challenge{baseClone}
 			newb, err := json.Marshal(newCh)
 			assert.FatalError(t, err)
@@ -849,7 +862,7 @@ func TestDNS01Validate(t *testing.T) {
 			expErr := DNSErr(errors.Errorf("error looking up TXT records for "+
 				"domain %s: force", ch.getValue()))
 			baseClone := ch.clone()
-			baseClone.Error = expErr
+			baseClone.Error = expErr.ToACME()
 			newCh := &dns01Challenge{baseClone}
 			newb, err := json.Marshal(newCh)
 			assert.FatalError(t, err)
@@ -904,7 +917,7 @@ func TestDNS01Validate(t *testing.T) {
 			expErr := RejectedIdentifierErr(errors.Errorf("keyAuthorization does not match; "+
 				"expected %s, but got %s", expKeyAuth, []string{"foo", "bar"}))
 			baseClone := ch.clone()
-			baseClone.Error = expErr
+			baseClone.Error = expErr.ToACME()
 			newCh := &http01Challenge{baseClone}
 			newb, err := json.Marshal(newCh)
 			assert.FatalError(t, err)
