@@ -308,6 +308,7 @@ func TestHandlerGetOrder(t *testing.T) {
 				assert.FatalError(t, err)
 				assert.Equals(t, bytes.TrimSpace(body), expB)
 				assert.Equals(t, res.Header["Location"], []string{url})
+				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
 			}
 		})
 	}
@@ -524,6 +525,7 @@ func TestHandlerNewOrder(t *testing.T) {
 				assert.Equals(t, bytes.TrimSpace(body), expB)
 				assert.Equals(t, res.Header["Location"],
 					[]string{fmt.Sprintf("https://ca.smallstep.com/acme/order/%s", o.ID)})
+				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
 			}
 		})
 	}
@@ -708,6 +710,7 @@ func TestHandlerFinalizeOrder(t *testing.T) {
 				assert.Equals(t, bytes.TrimSpace(body), expB)
 				assert.Equals(t, res.Header["Location"],
 					[]string{fmt.Sprintf("https://ca.smallstep.com/acme/order/%s", o.ID)})
+				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
 			}
 		})
 	}

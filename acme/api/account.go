@@ -126,8 +126,7 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Location", h.Auth.GetLink(acme.AccountLink, true, acc.GetID()))
-	w.WriteHeader(httpStatus)
-	api.JSON(w, acc)
+	api.JSONStatus(w, acc, httpStatus)
 	logAccount(w, acc)
 	return
 }
@@ -167,7 +166,6 @@ func (h *Handler) GetUpdateAccount(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.Header().Set("Location", h.Auth.GetLink(acme.AccountLink, true, acc.GetID()))
-	w.WriteHeader(http.StatusOK)
 	api.JSON(w, acc)
 	logAccount(w, acc)
 	return
@@ -200,7 +198,6 @@ func (h *Handler) GetOrdersByAccount(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, err)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
 	api.JSON(w, orders)
 	logOrdersByAccount(w, orders)
 	return

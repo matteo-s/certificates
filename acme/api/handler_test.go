@@ -243,6 +243,7 @@ func TestHandlerGetDirectory(t *testing.T) {
 	var dir acme.Directory
 	json.Unmarshal(bytes.TrimSpace(body), &dir)
 	assert.Equals(t, dir, expDir)
+	assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
 }
 
 func TestHandlerGetAuthz(t *testing.T) {
@@ -374,6 +375,7 @@ func TestHandlerGetAuthz(t *testing.T) {
 				assert.FatalError(t, err)
 				assert.Equals(t, bytes.TrimSpace(body), expB)
 				assert.Equals(t, res.Header["Location"], []string{url})
+				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
 			}
 		})
 	}
@@ -486,8 +488,6 @@ func TestHandlerGetCertificate(t *testing.T) {
 				assert.Equals(t, ae.Subproblems, prob.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
-				//var gotAz acme.Authz
-				//assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &gotAz))
 				assert.Equals(t, bytes.TrimSpace(body), bytes.TrimSpace(certBytes))
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/pem-certificate-chain; charset=utf-8"})
 			}
@@ -693,6 +693,7 @@ func TestHandlerGetChallenge(t *testing.T) {
 				assert.Equals(t, bytes.TrimSpace(body), expB)
 				assert.Equals(t, res.Header["Link"], []string{fmt.Sprintf("<https://ca.smallstep.com/acme/authz/%s>;rel=\"up\"", tc.ch.AuthzID)})
 				assert.Equals(t, res.Header["Location"], []string{url})
+				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
 			}
 		})
 	}

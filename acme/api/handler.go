@@ -114,7 +114,6 @@ func logDirectory(w http.ResponseWriter, dir *acme.Directory) {
 // GetDirectory is the ACME resource for returning a directory configuration
 // for client configuration.
 func (h *Handler) GetDirectory(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
 	dir := h.Auth.GetDirectory()
 	api.JSON(w, dir)
 	logDirectory(w, dir)
@@ -150,7 +149,6 @@ func (h *Handler) GetAuthz(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Location", h.Auth.GetLink(acme.AuthzLink, true, authz.GetID()))
-	w.WriteHeader(http.StatusOK)
 	api.JSON(w, authz)
 	logAuthz(w, authz)
 	return
@@ -207,7 +205,6 @@ func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 	getLink := h.Auth.GetLink
 	w.Header().Add("Link", link(getLink(acme.AuthzLink, true, ch.GetAuthzID()), "up"))
 	w.Header().Set("Location", getLink(acme.ChallengeLink, true, ch.GetID()))
-	w.WriteHeader(http.StatusOK)
 	api.JSON(w, ch)
 	logChallenge(w, ch)
 	return
@@ -228,7 +225,6 @@ func (h *Handler) GetCertificate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/pem-certificate-chain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
 	w.Write(certBytes)
 	return
 }

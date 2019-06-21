@@ -244,6 +244,7 @@ func TestHandlerGetOrdersByAccount(t *testing.T) {
 				expB, err := json.Marshal(oids)
 				assert.FatalError(t, err)
 				assert.Equals(t, bytes.TrimSpace(body), expB)
+				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
 			}
 		})
 	}
@@ -447,6 +448,7 @@ func TestHandlerNewAccount(t *testing.T) {
 				assert.Equals(t, bytes.TrimSpace(body), expB)
 				assert.Equals(t, res.Header["Location"],
 					[]string{fmt.Sprintf("https://ca.smallstep.com/acme/account/%s", accID)})
+				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
 			}
 		})
 	}
@@ -668,6 +670,7 @@ func TestHandlerGetUpdateAccount(t *testing.T) {
 				assert.Equals(t, bytes.TrimSpace(body), expB)
 				assert.Equals(t, res.Header["Location"],
 					[]string{fmt.Sprintf("https://ca.smallstep.com/acme/account/%s", accID)})
+				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
 			}
 		})
 	}

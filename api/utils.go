@@ -25,7 +25,14 @@ func LogError(rw http.ResponseWriter, err error) {
 
 // JSON writes the passed value into the http.ResponseWriter.
 func JSON(w http.ResponseWriter, v interface{}) {
+	JSONStatus(w, v, http.StatusOK)
+}
+
+// JSONStatus writes the given value into the http.ResponseWriter and the
+// given status is written as the status code of the response.
+func JSONStatus(w http.ResponseWriter, v interface{}, status int) {
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		LogError(w, err)
 	}

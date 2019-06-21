@@ -125,8 +125,7 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Location", h.Auth.GetLink(acme.OrderLink, true, o.GetID()))
-	w.WriteHeader(http.StatusCreated)
-	api.JSON(w, o)
+	api.JSONStatus(w, o, http.StatusCreated)
 	logOrder(w, o)
 	return
 }
@@ -146,7 +145,6 @@ func (h *Handler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Location", h.Auth.GetLink(acme.OrderLink, true, o.GetID()))
-	w.WriteHeader(http.StatusOK)
 	api.JSON(w, o)
 	logOrder(w, o)
 	return
@@ -182,7 +180,6 @@ func (h *Handler) FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Location", h.Auth.GetLink(acme.OrderLink, true, o.ID))
-	w.WriteHeader(http.StatusOK)
 	api.JSON(w, o)
 	logOrder(w, o)
 	return
