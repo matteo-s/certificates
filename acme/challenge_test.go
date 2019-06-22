@@ -3,6 +3,7 @@ package acme
 import (
 	"bytes"
 	"crypto"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -953,11 +954,13 @@ func TestDNS01Validate(t *testing.T) {
 
 			expKeyAuth, err := keyAuthorization(ch.getToken(), jwk)
 			assert.FatalError(t, err)
+			h := sha256.Sum256([]byte(expKeyAuth))
+			expected := base64.RawURLEncoding.EncodeToString(h[:])
 			return test{
 				ch: ch,
 				vo: validateOptions{
 					lookupTxt: func(url string) ([]string, error) {
-						return []string{"foo", expKeyAuth}, nil
+						return []string{"foo", expected}, nil
 					},
 				},
 				jwk: jwk,
@@ -980,6 +983,8 @@ func TestDNS01Validate(t *testing.T) {
 
 			expKeyAuth, err := keyAuthorization(ch.getToken(), jwk)
 			assert.FatalError(t, err)
+			h := sha256.Sum256([]byte(expKeyAuth))
+			expected := base64.RawURLEncoding.EncodeToString(h[:])
 
 			baseClone := ch.clone()
 			baseClone.Status = StatusValid
@@ -990,7 +995,7 @@ func TestDNS01Validate(t *testing.T) {
 				res: newCh,
 				vo: validateOptions{
 					lookupTxt: func(url string) ([]string, error) {
-						return []string{"foo", expKeyAuth}, nil
+						return []string{"foo", expected}, nil
 					},
 				},
 				jwk: jwk,

@@ -2,6 +2,7 @@ package acme
 
 import (
 	"crypto"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -356,7 +357,7 @@ func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validat
 		return nil, MalformedErr(errors.New("challenge already has invalid status"))
 	}
 
-	txtRecords, err := vo.lookupTxt(dc.Value)
+	txtRecords, err := vo.lookupTxt("_acme-challenge." + dc.Value)
 	if err != nil {
 		return nil, dc.storeAndReturnError(db,
 			DNSErr(errors.Wrapf(err, "error looking up TXT "+
@@ -367,9 +368,11 @@ func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validat
 	if err != nil {
 		return nil, err
 	}
+	h := sha256.Sum256([]byte(expectedKeyAuth))
+	expected := base64.RawURLEncoding.EncodeToString(h[:])
 	var found bool
 	for _, r := range txtRecords {
-		if r == expectedKeyAuth {
+		if r == expected {
 			found = true
 			break
 		}
